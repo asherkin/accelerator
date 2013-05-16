@@ -1,6 +1,19 @@
 # vim: set ts=2 sw=2 tw=99 noet ft=python: 
 import os
+import ambuild.osutil as osutil
 from ambuild.command import SymlinkCommand
+from ambuild.command import ShellCommand
+
+def BuildBreakpad():
+	breakpad = AMBuild.AddJob('google-breakpad')
+	if AMBuild.target['platform'] not in ['linux']:
+		return
+	if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')):
+		return
+	breakpad.AddCommand(ShellCommand(os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'configure')))
+	breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
+
+BuildBreakpad()
 
 for i in SM.sdkInfo:
 	sdk = SM.sdkInfo[i]
@@ -16,7 +29,7 @@ for i in SM.sdkInfo:
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'extensions'))
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'sourcepawn'))
 
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['BREAKPAD'], 'src'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src'))
 
 	name = 'accelerator.ext.' + sdk['ext']
 	extension = AMBuild.AddJob(name)
@@ -30,7 +43,7 @@ for i in SM.sdkInfo:
 	SM.PostSetupHL2Job(extension, binary, i)
 
 	link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
-	target = os.path.join(AMBuild.cache['BREAKPAD'], 'src', 'client', 'linux', 'libbreakpad_client.a')
+	target = os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')
 	try:
 		os.lstat(link)
 	except:
