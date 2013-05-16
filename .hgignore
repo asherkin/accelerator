@@ -1,0 +1,24 @@
+syntax: glob
+build
+google-breakpad/android
+google-breakpad/codereview.settings
+google-breakpad/README.ANDROID
+google-breakpad/src/client/apple
+google-breakpad/src/client/ios
+google-breakpad/src/client/mac
+google-breakpad/src/client/solaris
+google-breakpad/src/client/windows
+google-breakpad/src/common/android
+google-breakpad/src/common/mac
+google-breakpad/src/common/solaris
+google-breakpad/src/common/testdata
+google-breakpad/src/common/tests
+google-breakpad/src/common/windows
+google-breakpad/src/processor
+google-breakpad/src/testing
+google-breakpad/src/third_party/curl
+google-breakpad/src/third_party/glog
+google-breakpad/src/third_party/libdisasm
+google-breakpad/src/third_party/linux
+google-breakpad/src/third_party/protobuf
+google-breakpad/src/tools

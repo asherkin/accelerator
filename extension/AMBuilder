@@ -1,0 +1,44 @@
+# vim: set ts=2 sw=2 tw=99 noet ft=python: 
+import os
+from ambuild.command import SymlinkCommand
+
+for i in SM.sdkInfo:
+	sdk = SM.sdkInfo[i]
+	if AMBuild.target['platform'] not in sdk['platform']:
+		continue
+
+	compiler = SM.DefaultHL2Compiler('extension', i)
+
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension', 'sdk'))
+	
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'extensions'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'sourcepawn'))
+
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['BREAKPAD'], 'src'))
+
+	name = 'accelerator.ext.' + sdk['ext']
+	extension = AMBuild.AddJob(name)
+	binary = Cpp.LibraryBuilder(name, AMBuild, extension, compiler)
+	SM.PreSetupHL2Job(extension, binary, i)
+	binary.AddSourceFiles('extension', [
+		'extension.cpp',
+		'MemoryDownloader.cpp',
+		'sdk/smsdk_ext.cpp'
+		])
+	SM.PostSetupHL2Job(extension, binary, i)
+
+	link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
+	target = os.path.join(AMBuild.cache['BREAKPAD'], 'src', 'client', 'linux', 'libbreakpad_client.a')
+	try:
+		os.lstat(link)
+	except:
+		extension.AddCommand(SymlinkCommand(link, target))
+
+	binary.AddObjectFiles(['libbreakpad_client.a'])
+
+	SM.AutoVersion('extension', binary)
+	SM.ExtractDebugInfo(extension, binary)
+	binary.SendToJob()
+
