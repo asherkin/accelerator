@@ -49,7 +49,7 @@ const int kNumHandledSignals = sizeof(kExceptionSignals) / sizeof(kExceptionSign
 
 static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, void* context, bool succeeded)
 {
-	printf("Dump path: %s\n", descriptor.path());
+	printf("Wrote minidump to: %s\n", descriptor.path());
 	return succeeded;
 }
 
@@ -70,8 +70,6 @@ void OnGameFrame(bool simulating)
 	if (!weHaveBeenFuckedOver) {
 		return;
 	}
-
-	META_CONPRINTF(">>> SOME BITCH OVERWROTE OUR HANDLER\n");
 
 	struct sigaction act;
 	memset(&act, 0, sizeof(act));
@@ -112,8 +110,6 @@ void UploadCrashDump(const char *path)
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
-	META_CONPRINTF(">>> MinidumpAccount: %s\n", g_pSM->GetCoreConfigValue("MinidumpAccount"));
-
 	DIR *dumps = opendir(buffer);
 	dirent *dump;
 

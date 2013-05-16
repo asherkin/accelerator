@@ -61,7 +61,6 @@ class SM:
 			#Detect variables
 			envvars = { 'MMSOURCE19':    'mmsource-1.9',
 			            'SOURCEMOD15':   'sourcemod-central',
-                  'BREAKPAD':      'google-breakpad',
 			            'HL2SDKCSS':     'hl2sdk-css',
 			            'HL2SDKOBVALVE': 'hl2sdk-ob-valve',
 			            'HL2SDKL4D':     'hl2sdk-l4d',
