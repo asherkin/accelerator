@@ -10,7 +10,7 @@ def BuildBreakpad():
 		return
 	if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')):
 		return
-	breakpad.AddCommand(ShellCommand(os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'configure')))
+	breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'configure')))
 	breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
 
 BuildBreakpad()
