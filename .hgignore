@@ -15,7 +15,6 @@ syntax: regexp
 ^google-breakpad/src/common/solaris
 ^google-breakpad/src/common/testdata
 ^google-breakpad/src/common/tests
-^google-breakpad/src/common/windows
 ^google-breakpad/src/processor
 ^google-breakpad/src/testing
 ^google-breakpad/src/third_party/curl
