@@ -22,11 +22,16 @@
 #include <IWebternet.h>
 #include "MemoryDownloader.h"
 
+#if defined _LINUX
 #include "client/linux/handler/exception_handler.h"
 
 #include <signal.h>
 #include <dirent.h> 
 #include <unistd.h>
+#elif defined _WINDOWS
+#define _STDINT // ~.~
+#include "client/windows/handler/exception_handler.h"
+#endif
 
 Accelerator g_accelerator;
 SMEXT_LINK(&g_accelerator);
@@ -37,6 +42,7 @@ static IThreadHandle *uploadThread;
 char buffer[255];
 google_breakpad::ExceptionHandler *handler = NULL;
 
+#if defined _LINUX
 void (*SignalHandler)(int, siginfo_t *, void *);
 
 const int kExceptionSignals[] = {
@@ -84,6 +90,39 @@ void OnGameFrame(bool simulating)
 		sigaction(kExceptionSignals[i], &act, NULL);
 	}
 }
+#elif defined _WINDOWS
+LONG CALLBACK BreakpadVectoredHandler(_In_ PEXCEPTION_POINTERS ExceptionInfo)
+{
+	if (ExceptionInfo->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION)
+	{
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+	
+	if (handler->WriteMinidumpForException(ExceptionInfo))
+	{
+		// Stop the handler thread from deadlocking us.
+		delete handler;
+		
+		// Stop Valve's handler being called.
+		ExceptionInfo->ExceptionRecord->ExceptionCode = EXCEPTION_BREAKPOINT;
+		
+		return EXCEPTION_EXECUTE_HANDLER;
+	} else {
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+}
+
+static bool dumpCallback(const wchar_t* dump_path,
+                         const wchar_t* minidump_id,
+                         void* context,
+                         EXCEPTION_POINTERS* exinfo,
+                         MDRawAssertionInfo* assertion,
+                         bool succeeded)
+{
+	printf("Wrote minidump to: %ls\\%ls.dmp\n", dump_path, minidump_id);
+	return succeeded;
+}
+#endif
 
 void UploadCrashDump(const char *path)
 {
@@ -97,6 +136,8 @@ void UploadCrashDump(const char *path)
 	IWebTransfer *xfer = webternet->CreateSession();
 	xfer->SetFailOnHTTPError(true);
 
+	printf(">>> UPLOADING %s\n", path);
+	
 	if (!xfer->PostAndDownload("http://crash.limetech.org/submit", form, &data, NULL))
 	{
 		printf(">>> UPLOAD FAILED\n");
@@ -108,25 +149,31 @@ void UploadCrashDump(const char *path)
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
-	DIR *dumps = opendir(buffer);
-	dirent *dump;
+	IDirectory *dumps = libsys->OpenDirectory(buffer);
 
 	char path[512];
 
-	while ((dump = readdir(dumps)) != NULL)
+	while (dumps->MoreFiles())
 	{
-		if (dump->d_type == DT_DIR)
+		if (!dumps->IsEntryFile())
+		{
+			dumps->NextEntry();
 			continue;
-
-		printf(">>> UPLOADING %s\n", dump->d_name);
+		}
 		
-		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, dump->d_name);
-
+		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, dumps->GetEntryName());
 		UploadCrashDump(path);
+		
+#if defined _LINUX
 		unlink(path);
+#elif defined _WINDOWS
+		_unlink(path);
+#endif
+
+		dumps->NextEntry();
 	}
 
-	closedir(dumps);
+	libsys->CloseDirectory(dumps);
 }
 
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
@@ -134,7 +181,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	sharesys->AddDependency(myself, "webternet.ext", true, true);
 	SM_GET_IFACE(WEBTERNET, webternet);
 
-	g_pSM->BuildPath(Path_SM, buffer, 255, "data/dumps");
+	g_pSM->BuildPath(Path_SM, buffer, sizeof(buffer), "data/dumps");
 
 	if (!libsys->IsPathDirectory(buffer))
 	{
@@ -146,20 +193,39 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		}
 	}
 
+#if defined _LINUX
 	google_breakpad::MinidumpDescriptor descriptor(buffer);
 	handler = new google_breakpad::ExceptionHandler(descriptor, NULL, dumpCallback, NULL, true, -1);
 
 	struct sigaction oact;
 	sigaction(SIGSEGV, NULL, &oact);
 	SignalHandler = oact.sa_sigaction;
-
+	
 	g_pSM->AddGameFrameHook(OnGameFrame);
+#elif defined _WINDOWS
+	wchar_t *buf = new wchar_t[sizeof(buffer)];
+	size_t num_chars = mbstowcs(buf, buffer, sizeof(buffer));
+
+	handler = new google_breakpad::ExceptionHandler(std::wstring(buf, num_chars), NULL, dumpCallback, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL);
+
+	AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
+	
+	delete buf;
+#endif
+
+	
 
 	return true;
 }
 
 void Accelerator::SDK_OnUnload() 
 {
+#if defined _LINUX
 	g_pSM->RemoveGameFrameHook(OnGameFrame);
+#elif defined _WINDOWS
+	RemoveVectoredExceptionHandler(BreakpadVectoredHandler);
+#endif
+
+	delete handler;
 }
 

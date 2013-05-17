@@ -3,9 +3,10 @@ import os
 import ambuild.osutil as osutil
 from ambuild.command import SymlinkCommand
 from ambuild.command import ShellCommand
+from ambuild.command import DirectCommand
 
 def BuildEverything():
-	if AMBuild.target['platform'] not in ['linux']:
+	if AMBuild.target['platform'] not in ['linux', 'windows']:
 		return
 
 	BuildBreakpad()
@@ -14,11 +15,23 @@ def BuildEverything():
 def BuildBreakpad():
 	breakpad = AMBuild.AddJob('google-breakpad')
 
-	if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')):
-		return
+	if AMBuild.target['platform'] in ['linux']:
+		if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')):
+			return
 
-	breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'configure')))
-	breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
+		breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'configure')))
+		breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
+		
+	elif AMBuild.target['platform'] in ['windows']:
+		if osutil.FileExists(os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib')):
+			return
+		
+		gyp = os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src', 'tools', 'gyp', 'gyp.bat')
+		gyppath = os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src', 'client', 'windows', 'handler', 'exception_handler.gyp')
+		breakpad.AddCommand(DirectCommand([gyp, gyppath]))
+		
+		slnpath = os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src', 'client', 'windows', 'handler', 'exception_handler.sln')
+		breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
 
 def BuildExtension():
 	compiler = SM.DefaultCompiler()
@@ -32,8 +45,9 @@ def BuildExtension():
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src'))
 
-	compiler['POSTLINKFLAGS'].append('-lstdc++')
-	compiler['POSTLINKFLAGS'].append('-pthread')
+	if AMBuild.target['platform'] in ['linux']:
+		compiler['POSTLINKFLAGS'].append('-lstdc++')
+		compiler['POSTLINKFLAGS'].append('-pthread')
 
 	name = 'accelerator.ext'
 	extension = AMBuild.AddJob(name)
@@ -45,13 +59,22 @@ def BuildExtension():
 		'sdk/smsdk_ext.cpp'
 	])
 
-	link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
-	target = os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')
-	try:
-		os.lstat(link)
-	except:
-		extension.AddCommand(SymlinkCommand(link, target))
-		binary.AddObjectFiles(['libbreakpad_client.a'])
+	if AMBuild.target['platform'] in ['linux']:
+		link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
+		target = os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')
+		try:
+			os.lstat(link)
+		except:
+			extension.AddCommand(SymlinkCommand(link, target))
+			binary.AddObjectFiles(['libbreakpad_client.a'])
+
+	elif AMBuild.target['platform'] in ['windows']:
+		libs = ['exception_handler', 'common', 'crash_generation_client']
+		for lib in libs:
+			path = os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
+			if os.path.isfile(path):
+				binary.RelinkIfNewer(path)
+			binary['POSTLINKFLAGS'].extend([path])
 
 	SM.AutoVersion('extension', binary)
 	SM.ExtractDebugInfo(extension, binary)
