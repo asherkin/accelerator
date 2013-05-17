@@ -67,7 +67,7 @@ class CopyFile(Command):
 		shutil.copy(self.fromFile, self.toPath)
 
 
-folders = [['addons', 'sourcemod', 'extensions'], ['addons', 'sourcemod', 'data', 'dumps']]
+folders = [['addons', 'sourcemod', 'extensions']]
 
 #Setup
 job.AddCommand(DestroyPath(os.path.join(AMBuild.outputFolder, 'package')))

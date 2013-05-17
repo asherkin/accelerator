@@ -136,6 +136,16 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	g_pSM->BuildPath(Path_SM, buffer, 255, "data/dumps");
 
+	if (!libsys->IsPathDirectory(buffer))
+	{
+		if (!libsys->CreateFolder(buffer))
+		{
+			if (error)
+				g_pSM->Format(error, maxlength, "%s didn't exist and we couldn't create it :(", buffer);
+			return false;
+		}
+	}
+
 	google_breakpad::MinidumpDescriptor descriptor(buffer);
 	handler = new google_breakpad::ExceptionHandler(descriptor, NULL, dumpCallback, NULL, true, -1);
 
