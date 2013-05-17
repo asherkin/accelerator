@@ -34,8 +34,6 @@ SMEXT_LINK(&g_accelerator);
 IWebternet *webternet;
 static IThreadHandle *uploadThread;
 
-ConVar acceleratorVersion("accelerator_version", SMEXT_CONF_VERSION, FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY, SMEXT_CONF_DESCRIPTION " Version");
-
 char buffer[255];
 google_breakpad::ExceptionHandler *handler = NULL;
 
@@ -101,10 +99,10 @@ void UploadCrashDump(const char *path)
 
 	if (!xfer->PostAndDownload("http://crash.limetech.org/submit", form, &data, NULL))
 	{
-		META_CONPRINTF(">>> UPLOAD FAILED\n");
+		printf(">>> UPLOAD FAILED\n");
 	} else {
-		META_CONPRINTF(">>> UPLOADED CRASH DUMP");
-		META_CONPRINTF("%s", data.GetBuffer());
+		printf(">>> UPLOADED CRASH DUMP");
+		printf("%s", data.GetBuffer());
 	}
 }
 
@@ -120,7 +118,7 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 		if (dump->d_type == DT_DIR)
 			continue;
 
-		META_CONPRINTF(">>> UPLOADING %s\n", dump->d_name);
+		printf(">>> UPLOADING %s\n", dump->d_name);
 		
 		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, dump->d_name);
 
@@ -150,29 +148,8 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	return true;
 }
 
-bool Accelerator::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late)
-{
-	GET_V_IFACE_CURRENT(GetEngineFactory, g_pCVar, ICvar, CVAR_INTERFACE_VERSION);
-
-	ConVar_Register(0, this);
-
-	return true;
-}
-
 void Accelerator::SDK_OnUnload() 
 {
 	g_pSM->RemoveGameFrameHook(OnGameFrame);
-}
-
-bool Accelerator::SDK_OnMetamodUnload(char *error, size_t maxlen)
-{
-	return true;
-}
-
-bool Accelerator::RegisterConCommandBase(ConCommandBase *pCommand)
-{
-	META_REGCVAR(pCommand);
-
-	return true;
 }
 

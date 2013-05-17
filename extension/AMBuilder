@@ -4,23 +4,24 @@ import ambuild.osutil as osutil
 from ambuild.command import SymlinkCommand
 from ambuild.command import ShellCommand
 
-def BuildBreakpad():
-	breakpad = AMBuild.AddJob('google-breakpad')
+def BuildEverything():
 	if AMBuild.target['platform'] not in ['linux']:
 		return
+
+	BuildBreakpad()
+	BuildExtension();
+
+def BuildBreakpad():
+	breakpad = AMBuild.AddJob('google-breakpad')
+
 	if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')):
 		return
+
 	breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'configure')))
 	breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
 
-BuildBreakpad()
-
-for i in SM.sdkInfo:
-	sdk = SM.sdkInfo[i]
-	if AMBuild.target['platform'] not in sdk['platform']:
-		continue
-
-	compiler = SM.DefaultHL2Compiler('extension', i)
+def BuildExtension():
+	compiler = SM.DefaultCompiler()
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension'))
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension', 'sdk'))
@@ -31,16 +32,18 @@ for i in SM.sdkInfo:
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src'))
 
-	name = 'accelerator.ext.' + sdk['ext']
+	compiler['POSTLINKFLAGS'].append('-lstdc++')
+	compiler['POSTLINKFLAGS'].append('-pthread')
+
+	name = 'accelerator.ext'
 	extension = AMBuild.AddJob(name)
 	binary = Cpp.LibraryBuilder(name, AMBuild, extension, compiler)
-	SM.PreSetupHL2Job(extension, binary, i)
+
 	binary.AddSourceFiles('extension', [
 		'extension.cpp',
 		'MemoryDownloader.cpp',
 		'sdk/smsdk_ext.cpp'
-		])
-	SM.PostSetupHL2Job(extension, binary, i)
+	])
 
 	link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
 	target = os.path.join(AMBuild.outputFolder, 'google-breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')
@@ -48,10 +51,11 @@ for i in SM.sdkInfo:
 		os.lstat(link)
 	except:
 		extension.AddCommand(SymlinkCommand(link, target))
-
-	binary.AddObjectFiles(['libbreakpad_client.a'])
+		binary.AddObjectFiles(['libbreakpad_client.a'])
 
 	SM.AutoVersion('extension', binary)
 	SM.ExtractDebugInfo(extension, binary)
+
 	binary.SendToJob()
 
+BuildEverything()

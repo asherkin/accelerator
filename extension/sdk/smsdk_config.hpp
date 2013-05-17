@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * connect Extension
+ * Accelerator Extension
  * Copyright (C) 2011 Asher Baker (asherkin).  All rights reserved.
  * =============================================================================
  *
@@ -55,7 +55,7 @@
  * @brief Sets whether or not this plugin required Metamod.
  * NOTE: Uncomment to enable, comment to disable.
  */
-#define SMEXT_CONF_METAMOD		
+//#define SMEXT_CONF_METAMOD		
 
 /** Enable interfaces you want to use here by uncommenting lines */
 //#define SMEXT_ENABLE_FORWARDSYS
@@ -67,7 +67,7 @@
 //#define SMEXT_ENABLE_GAMEHELPERS
 //#define SMEXT_ENABLE_TIMERSYS
 #define SMEXT_ENABLE_THREADER
-//#define SMEXT_ENABLE_LIBSYS
+#define SMEXT_ENABLE_LIBSYS
 //#define SMEXT_ENABLE_MENUS
 //#define SMEXT_ENABLE_ADTFACTORY
 //#define SMEXT_ENABLE_PLUGINSYS

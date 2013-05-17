@@ -98,7 +98,7 @@ def AddHL2Library(name, dest):
 
 debug_info = []
 
-AddHL2Library('accelerator', 'extensions')
+AddNormalLibrary('accelerator.ext', 'extensions')
 
 job.AddCommandGroup(bincopies)
 	

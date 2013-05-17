@@ -1,7 +1,7 @@
 /**
  * =============================================================================
- * TF2 Items Extension
- * Copyright (C) 2009-2010 AzuiSleet, Asher Baker (asherkin).  All rights reserved.
+ * Accelerator Extension
+ * Copyright (C) 2009-2010 Asher Baker (asherkin).  All rights reserved.
  * =============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -32,7 +32,7 @@
  * @brief Sample implementation of the SDK Extension.
  * Note: Uncomment one of the pre-defined virtual functions in order to use it.
  */
-class Accelerator : public SDKExtension, public IConCommandBaseAccessor
+class Accelerator : public SDKExtension
 {
 public:
 	/**
@@ -73,7 +73,7 @@ public:
 	 * @param late			Whether or not Metamod considers this a late load.
 	 * @return				True to succeed, false to fail.
 	 */
-	virtual bool SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late);
+	//virtual bool SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late);
 
 	/**
 	 * @brief Called when Metamod is detaching, after the extension version is called.
@@ -83,7 +83,7 @@ public:
 	 * @param maxlength		Maximum size of error buffer.
 	 * @return				True to succeed, false to fail.
 	 */
-	virtual bool SDK_OnMetamodUnload(char *error, size_t maxlen);
+	//virtual bool SDK_OnMetamodUnload(char *error, size_t maxlen);
 
 	/**
 	 * @brief Called when Metamod's pause state is changing.
@@ -97,8 +97,6 @@ public:
 	//virtual bool SDK_OnMetamodPauseChange(bool paused, char *error, size_t maxlen);
 #endif
 	virtual void OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax);
-public: //IConCommandBaseAccessor
-	bool RegisterConCommandBase(ConCommandBase *pCommand);
 };
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_
