@@ -93,9 +93,16 @@ void OnGameFrame(bool simulating)
 #elif defined _WINDOWS
 LONG CALLBACK BreakpadVectoredHandler(_In_ PEXCEPTION_POINTERS ExceptionInfo)
 {
-	if (ExceptionInfo->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION)
+	switch (ExceptionInfo->ExceptionRecord->ExceptionCode)
 	{
-		return EXCEPTION_CONTINUE_SEARCH;
+		case EXCEPTION_ACCESS_VIOLATION:
+		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+		case EXCEPTION_DATATYPE_MISALIGNMENT:
+		case EXCEPTION_ILLEGAL_INSTRUCTION:
+		case EXCEPTION_STACK_OVERFLOW:
+			break;
+		default:
+			return EXCEPTION_CONTINUE_SEARCH;
 	}
 	
 	if (handler->WriteMinidumpForException(ExceptionInfo))
