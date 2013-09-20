@@ -31,7 +31,7 @@ def ReleaseVersion():
 	major, minor, release, tag = m.groups()
 	return '.'.join([major, minor, release])
 
-filename = '-'.join(['accelerator', ReleaseVersion(), 'hg' + HGVersion(), platform])
+filename = '-'.join([os.environ.get('project', 'accelerator'), ReleaseVersion(), 'hg' + HGVersion(), platform])
 
 debug_build = os.environ.get('is_debug_build', False) == "1"
 
