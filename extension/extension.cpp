@@ -99,7 +99,12 @@ LONG CALLBACK BreakpadVectoredHandler(_In_ PEXCEPTION_POINTERS ExceptionInfo)
 		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
 		case EXCEPTION_DATATYPE_MISALIGNMENT:
 		case EXCEPTION_ILLEGAL_INSTRUCTION:
+		case EXCEPTION_INT_DIVIDE_BY_ZERO:
 		case EXCEPTION_STACK_OVERFLOW:
+			break;
+		case 0: // Valve use this for Sys_Error.
+			if ((ExceptionInfo->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE) == 0)
+				return EXCEPTION_CONTINUE_SEARCH;
 			break;
 		default:
 			return EXCEPTION_CONTINUE_SEARCH;
