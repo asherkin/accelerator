@@ -1,5 +1,4 @@
-# Copyright (c) 2010, Google Inc.
-# All rights reserved.
+# Copyright 2010 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -32,34 +31,13 @@
 # since gyp_chromium is automatically forcing its inclusion.
 {
   'variables': {
-    # .gyp files or targets should set chromium_code to 1 if they build
-    # Chromium-specific code, as opposed to external code.  This variable is
-    # used to control such things as the set of warnings to enable, and
-    # whether warnings are treated as errors.
-    'chromium_code%': 0,
-
     # Variables expected to be overriden on the GYP command line (-D) or by
     # ~/.gyp/include.gypi.
 
     # Putting a variables dict inside another variables dict looks kind of
-    # weird.  This is done so that "branding" and "buildtype" are defined as
-    # variables within the outer variables dict here.  This is necessary
-    # to get these variables defined for the conditions within this variables
-    # dict that operate on these variables.
+    # weird. This is necessary to get these variables defined for the conditions
+    # within this variables dict that operate on these variables.
     'variables': {
-      # Override branding to select the desired branding flavor.
-      'branding%': 'Chromium',
-
-      # Override buildtype to select the desired build flavor.
-      # Dev - everyday build for development/testing
-      # Official - release build (generally implies additional processing)
-      # TODO(mmoss) Once 'buildtype' is fully supported (e.g. Windows gyp
-      # conversion is done), some of the things which are now controlled by
-      # 'branding', such as symbol generation, will need to be refactored based
-      # on 'buildtype' (i.e. we don't care about saving symbols for non-Official
-      # builds).
-      'buildtype%': 'Dev',
-
       'variables': {
         # Compute the architecture that we're building on.
         'conditions': [
@@ -73,23 +51,7 @@
             'host_arch%': 'ia32',
           }],
         ],
-
-        # Whether we're building a ChromeOS build.  We set the initial
-        # value at this level of nesting so it's available for the
-        # toolkit_views test below.
-        'chromeos%': '0',
       },
-
-      # Set default value of toolkit_views on for Windows and Chrome OS.
-      # We set it at this level of nesting so the value is available for
-      # other conditionals below.
-      'conditions': [
-        ['OS=="win" or chromeos==1', {
-          'toolkit_views%': 1,
-        }, {
-          'toolkit_views%': 0,
-        }],
-      ],
 
       'host_arch%': '<(host_arch)',
 
@@ -97,24 +59,10 @@
       # building on.
       'target_arch%': '<(host_arch)',
 
-      # We do want to build Chromium with Breakpad support in certain
-      # situations. I.e. for Chrome bot.
-      'linux_chromium_breakpad%': 0,
-      # And if we want to dump symbols.
-      'linux_chromium_dump_symbols%': 0,
-      # Also see linux_strip_binary below.
-
-      # Copy conditionally-set chromeos variable out one scope.
-      'chromeos%': '<(chromeos)',
-
       # This variable tells WebCore.gyp and JavaScriptCore.gyp whether they are
       # are built under a chromium full build (1) or a webkit.org chromium
       # build (0).
       'inside_chromium_build%': 1,
-
-      # Set to 1 to enable fast builds. It disables debug info for fastest
-      # compilation.
-      'fastbuild%': 0,
 
       # Set to 1 compile with -fPIC cflag on linux. This is a must for shared
       # libraries on linux x86-64 and arm.
@@ -123,10 +71,10 @@
       # Python version.
       'python_ver%': '2.5',
 
-      # Set ARM-v7 compilation flags
-      'armv7%': 0,
+      # Determine ARM compilation flags.
+      'arm_version%': 7,
 
-      # Set Neon compilation flags (only meaningful if armv7==1).
+      # Set Neon compilation flags (only meaningful if arm_version==7).
       'arm_neon%': 1,
 
       # The system root for cross-compiles. Default: none.
@@ -136,19 +84,12 @@
       'disable_sse2%': 0,
     },
 
-    # Define branding and buildtype on the basis of their settings within the
-    # variables sub-dict above, unless overridden.
-    'branding%': '<(branding)',
-    'buildtype%': '<(buildtype)',
     'target_arch%': '<(target_arch)',
     'host_arch%': '<(host_arch)',
-    'toolkit_views%': '<(toolkit_views)',
-    'chromeos%': '<(chromeos)',
     'inside_chromium_build%': '<(inside_chromium_build)',
-    'fastbuild%': '<(fastbuild)',
     'linux_fpic%': '<(linux_fpic)',
     'python_ver%': '<(python_ver)',
-    'armv7%': '<(armv7)',
+    'arm_version%': '<(arm_version)',
     'arm_neon%': '<(arm_neon)',
     'sysroot%': '<(sysroot)',
     'disable_sse2%': '<(disable_sse2)',
@@ -245,7 +186,7 @@
     'linux_use_seccomp_sandbox%': 0,
 
     # Set to select the Title Case versions of strings in GRD files.
-    'use_titlecase_in_grd_files%': 0,
+    'use_titlecase_in_grd%': 0,
 
     # Used to disable Native Client at compile time, for platforms where it
     # isn't supported
@@ -254,7 +195,7 @@
     # Set Thumb compilation flags.
     'arm_thumb%': 0,
 
-    # Set ARM fpu compilation flags (only meaningful if armv7==1 and
+    # Set ARM fpu compilation flags (only meaningful if arm_version==7 and
     # arm_neon==0).
     'arm_fpu%': 'vfpv3',
 
@@ -262,62 +203,6 @@
     'enable_new_npdevice_api%': 0,
 
     'conditions': [
-      ['OS=="linux" or OS=="freebsd" or OS=="openbsd"', {
-        # This will set gcc_version to XY if you are running gcc X.Y.*.
-        # This is used to tweak build flags for gcc 4.4.
-        'gcc_version%': '<!(python <(DEPTH)/build/compiler_version.py)',
-        # Figure out the python architecture to decide if we build pyauto.
-        'python_arch%': '<!(<(DEPTH)/build/linux/python_arch.sh <(sysroot)/usr/lib/libpython<(python_ver).so.1.0)',
-        'conditions': [
-          ['branding=="Chrome" or linux_chromium_breakpad==1', {
-            'linux_breakpad%': 1,
-          }, {
-            'linux_breakpad%': 0,
-          }],
-          # All Chrome builds have breakpad symbols, but only process the
-          # symbols from official builds.
-          # TODO(mmoss) dump_syms segfaults on x64. Enable once dump_syms and
-          # crash server handle 64-bit symbols.
-          ['linux_chromium_dump_symbols==1 or '
-           '(branding=="Chrome" and buildtype=="Official" and '
-           'target_arch=="ia32")', {
-            'linux_dump_symbols%': 1,
-          }, {
-            'linux_dump_symbols%': 0,
-          }],
-          ['toolkit_views==0', {
-            # GTK wants Title Case strings
-            'use_titlecase_in_grd_files%': 1,
-          }],
-        ],
-      }],  # OS=="linux" or OS=="freebsd" or OS=="openbsd"
-      ['OS=="mac"', {
-        # Mac wants Title Case strings
-        'use_titlecase_in_grd_files%': 1,
-        'conditions': [
-          # mac_product_name is set to the name of the .app bundle as it should
-          # appear on disk.  This duplicates data from
-          # chrome/app/theme/chromium/BRANDING and
-          # chrome/app/theme/google_chrome/BRANDING, but is necessary to get
-          # these names into the build system.
-          ['branding=="Chrome"', {
-            'mac_product_name%': 'Google Chrome',
-          }, { # else: branding!="Chrome"
-            'mac_product_name%': 'Chromium',
-          }],
-
-          # Feature variables for enabling Mac Breakpad and Keystone auto-update
-          # support.  Both features are on by default in official builds with
-          # Chrome branding.
-          ['branding=="Chrome" and buildtype=="Official"', {
-            'mac_breakpad%': 1,
-            'mac_keystone%': 1,
-          }, { # else: branding!="Chrome" or buildtype!="Official"
-            'mac_breakpad%': 0,
-            'mac_keystone%': 0,
-          }],
-        ],
-      }],  # OS=="mac"
       # Whether to use multiple cores to compile with visual studio. This is
       # optional because it sometimes causes corruption on VS 2005.
       # It is on by default on VS 2008 and off on VS 2005.
@@ -341,24 +226,6 @@
           'NACL_WIN64',
         ],
       }],
-      # Compute based on OS and target architecture whether the GPU
-      # plugin / process is supported.
-      [ 'OS=="win" or (OS=="linux" and target_arch!="arm") or OS=="mac"', {
-        # Enable a variable used elsewhere throughout the GYP files to determine
-        # whether to compile in the sources for the GPU plugin / process.
-        'enable_gpu%': 1,
-      }, {  # GPU plugin not supported
-        'enable_gpu%': 0,
-      }],
-      # Compute based on OS, target architecture and device whether GLES
-      # is supported
-      [ 'OS=="linux" and target_arch=="arm" and chromeos==1', {
-        # Enable a variable used elsewhere throughout the GYP files to determine
-        # whether to compile in the sources for the GLES support.
-        'enable_gles%': 1,
-      }, {  # GLES not supported
-        'enable_gles%': 0,
-      }],
     ],
 
     # NOTE: When these end up in the Mac bundle, we need to replace '-' for '_'
@@ -373,18 +240,10 @@
     ],
   },
   'target_defaults': {
+    'includes': [
+      'filename_rules.gypi',
+    ],
     'variables': {
-      # The condition that operates on chromium_code is in a target_conditions
-      # section, and will not have access to the default fallback value of
-      # chromium_code at the top of this file, or to the chromium_code
-      # variable placed at the root variables scope of .gyp files, because
-      # those variables are not set at target scope.  As a workaround,
-      # if chromium_code is not set at target scope, define it in target scope
-      # to contain whatever value it has during early variable expansion.
-      # That's enough to make it available during target conditional
-      # processing.
-      'chromium_code%': '<(chromium_code)',
-
       # See http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Optimize-Options.html
       'mac_release_optimization%': '3', # Use -O3 unless overridden
       'mac_debug_optimization%': '0',   # Use -O0 unless overridden
@@ -400,34 +259,6 @@
       'release_valgrind_build%': 0,
     },
     'conditions': [
-      ['branding=="Chrome"', {
-        'defines': ['GOOGLE_CHROME_BUILD'],
-      }, {  # else: branding!="Chrome"
-        'defines': ['CHROMIUM_BUILD'],
-      }],
-      ['toolkit_views==1', {
-        'defines': ['TOOLKIT_VIEWS=1'],
-      }],
-      ['chromeos==1', {
-        'defines': ['OS_CHROMEOS=1'],
-      }],
-      ['fastbuild!=0', {
-        'conditions': [
-          # Finally, for Windows, we simply turn on profiling.
-          ['OS=="win"', {
-            'msvs_settings': {
-              'VCLinkerTool': {
-                'GenerateDebugInformation': 'false',
-              },
-              'VCCLCompilerTool': {
-                'DebugInformationFormat': '0',
-              }
-            }
-          }, { # else: OS != "win"
-            'cflags': [ '-g1' ],
-          }],
-        ],  # conditions for fastbuild.
-      }],  # fastbuild!=0
       ['selinux==1', {
         'defines': ['CHROMIUM_SELINUX=1'],
       }],
@@ -436,16 +267,6 @@
           ['OS=="win"', {
             'defines': ['NO_TCMALLOC'],
           }],
-        ],
-      }],
-      ['enable_gpu==1', {
-        'defines': [
-          'ENABLE_GPU=1',
-        ],
-      }],
-      ['enable_gles==1', {
-        'defines': [
-          'ENABLE_GLES=1',
         ],
       }],
       ['coverage!=0', {
@@ -489,82 +310,34 @@
       }],  # coverage!=0
     ],  # conditions for 'target_defaults'
     'target_conditions': [
-      ['chromium_code==0', {
-        'conditions': [
-          [ 'OS=="linux" or OS=="freebsd" or OS=="openbsd"', {
-            'cflags!': [
-              '-Wall',
-              '-Wextra',
-              '-Werror',
-            ],
-          }],
-          [ 'OS=="win"', {
-            'defines': [
-              '_CRT_SECURE_NO_DEPRECATE',
-              '_CRT_NONSTDC_NO_WARNINGS',
-              '_CRT_NONSTDC_NO_DEPRECATE',
-            ],
-            'msvs_disabled_warnings': [4800],
-            'msvs_settings': {
-              'VCCLCompilerTool': {
-                'WarnAsError': 'false',
-                'Detect64BitPortabilityProblems': 'false',
-              },
-            },
-          }],
-          [ 'OS=="mac"', {
-            'xcode_settings': {
-              'GCC_TREAT_WARNINGS_AS_ERRORS': 'NO',
-              'WARNING_CFLAGS!': ['-Wall'],
-            },
-          }],
+      [ 'OS=="linux" or OS=="freebsd" or OS=="openbsd"', {
+        'cflags!': [
+          '-Wall',
+          '-Wextra',
+          '-Werror',
         ],
-      }, {
-        # In Chromium code, we define __STDC_FORMAT_MACROS in order to get the
-        # C99 macros on Mac and Linux.
+      }],
+      [ 'OS=="win"', {
         'defines': [
-          '__STDC_FORMAT_MACROS',
+          '_CRT_SECURE_NO_DEPRECATE',
+          '_CRT_NONSTDC_NO_WARNINGS',
+          '_CRT_NONSTDC_NO_DEPRECATE',
+          # This is required for ATL to use XP-safe versions of its functions.
+          '_USING_V110_SDK71_',
         ],
-        'conditions': [
-          ['OS!="win"', {
-            'sources/': [ ['exclude', '_win(_unittest)?\\.cc$'],
-                          ['exclude', '/win/'],
-                          ['exclude', '/win_[^/]*\\.cc$'] ],
-          }],
-          ['OS!="mac"', {
-            'sources/': [ ['exclude', '_(cocoa|mac)(_unittest)?\\.cc$'],
-                          ['exclude', '/(cocoa|mac)/'],
-                          ['exclude', '\.mm?$' ] ],
-          }],
-          ['OS!="linux" and OS!="freebsd" and OS!="openbsd"', {
-            'sources/': [
-              ['exclude', '_(chromeos|gtk|x|x11|xdg)(_unittest)?\\.cc$'],
-              ['exclude', '/gtk/'],
-              ['exclude', '/(gtk|x11)_[^/]*\\.cc$'],
-            ],
-          }],
-          ['OS!="linux"', {
-            'sources/': [
-              ['exclude', '_linux(_unittest)?\\.cc$'],
-              ['exclude', '/linux/'],
-            ],
-          }],
-          # We use "POSIX" to refer to all non-Windows operating systems.
-          ['OS=="win"', {
-            'sources/': [ ['exclude', '_posix\\.cc$'] ],
-          }],
-          # Though Skia is conceptually shared by Linux and Windows,
-          # the only _skia files in our tree are Linux-specific.
-          ['OS!="linux" and OS!="freebsd" and OS!="openbsd"', {
-            'sources/': [ ['exclude', '_skia\\.cc$'] ],
-          }],
-          ['chromeos!=1', {
-            'sources/': [ ['exclude', '_chromeos\\.cc$'] ]
-          }],
-          ['toolkit_views==0', {
-            'sources/': [ ['exclude', '_views\\.cc$'] ]
-          }],
-        ],
+        'msvs_disabled_warnings': [4800],
+        'msvs_settings': {
+          'VCCLCompilerTool': {
+            'WarnAsError': 'true',
+            'Detect64BitPortabilityProblems': 'false',
+          },
+        },
+      }],
+      [ 'OS=="mac"', {
+        'xcode_settings': {
+          'GCC_TREAT_WARNINGS_AS_ERRORS': 'NO',
+          'WARNING_CFLAGS!': ['-Wall'],
+        },
       }],
     ],  # target_conditions for 'target_defaults'
     'default_configuration': 'Debug',
@@ -590,6 +363,7 @@
         'abstract': 1,
         'msvs_settings': {
           'VCLinkerTool': {
+            'MinimumRequiredVersion': '5.01',  # XP.
             'TargetMachine': '1',
           },
         },
@@ -715,7 +489,30 @@
         'inherit_from': ['Common_Base', 'x86_Base', 'Release_Base'],
         'conditions': [
           ['msvs_use_common_release', {
-            'includes': ['release.gypi'],
+            'defines': ['OFFICIAL_BUILD'],
+            'msvs_settings': {
+              'VCCLCompilerTool': {
+                'Optimization': '3',
+                'StringPooling': 'true',
+                'OmitFramePointers': 'true',
+                'InlineFunctionExpansion': '2',
+                'EnableIntrinsicFunctions': 'true',
+                'FavorSizeOrSpeed': '2',
+                'OmitFramePointers': 'true',
+                'EnableFiberSafeOptimizations': 'true',
+                'WholeProgramOptimization': 'true',
+              },
+              'VCLibrarianTool': {
+                'AdditionalOptions': ['/ltcg', '/expectedoutputsize:120000000'],
+              },
+              'VCLinkerTool': {
+                'LinkIncremental': '1',
+                'OptimizeReferences': '2',
+                'EnableCOMDATFolding': '2',
+                'OptimizeForWindows98': '1',
+                'LinkTimeCodeGeneration': '1',
+              },
+            },
           }],
         ]
       },
@@ -773,7 +570,7 @@
           '-fvisibility=hidden',
         ],
         'cflags_cc': [
-          '-fno-rtti',
+          '-frtti',
           '-fno-threadsafe-statics',
           # Make inline functions have hidden visiblity by default.
           # Surprisingly, not covered by -fvisibility=hidden.
@@ -821,12 +618,6 @@
                            '$_LIBDIRFLAGS', '$LDMODULEFLAGS', '$SOURCES',
                            '-Wl,--start-group', '$_LIBFLAGS', '-Wl,--end-group']],
           'IMPLICIT_COMMAND_DEPENDENCIES': 0,
-          # -rpath is only used when building with shared libraries.
-          'conditions': [
-            [ 'component=="shared_library"', {
-              'RPATH': '$LIB_DIR',
-            }],
-          ],
         },
         'scons_import_variables': [
           'AS',
@@ -932,20 +723,11 @@
             # compiler optimized the code, since the value is always kept
             # in its specified precision.
             'conditions': [
-              ['branding=="Chromium" and disable_sse2==0', {
+              ['disable_sse2==0', {
                 'cflags': [
                   '-march=pentium4',
                   '-msse2',
                   '-mfpmath=sse',
-                ],
-              }],
-              # ChromeOS targets Pinetrail, which is sse3, but most of the
-              # benefit comes from sse2 so this setting allows ChromeOS
-              # to build on other CPUs.  In the future -march=atom would help
-              # but requires a newer compiler.
-              ['chromeos==1 and disable_sse2==0', {
-                'cflags': [
-                  '-msse2',
                 ],
               }],
             ],
@@ -980,7 +762,7 @@
                     '-Wa,-mimplicit-it=thumb',
                     ]
                   }],
-                  ['armv7==1', {
+                  ['arm_version==7', {
                     'cflags': [
                       '-march=armv7-a',
                       '-mtune=cortex-a8',
@@ -1017,24 +799,6 @@
           ['no_strict_aliasing==1', {
             'cflags': [
               '-fno-strict-aliasing',
-            ],
-          }],
-          ['linux_breakpad==1', {
-            'cflags': [ '-gstabs' ],
-            'defines': ['USE_LINUX_BREAKPAD'],
-          }],
-          ['linux_use_seccomp_sandbox==1 and buildtype!="Official"', {
-            'defines': ['USE_SECCOMP_SANDBOX'],
-          }],
-          ['library=="shared_library"', {
-            # When building with shared libraries, remove the visiblity-hiding
-            # flag.
-            'cflags!': [ '-fvisibility=hidden' ],
-            'conditions': [
-              ['target_arch=="x64" or target_arch=="arm"', {
-                # Shared libraries need -fPIC on x86-64 and arm
-                'cflags': ['-fPIC']
-              }]
             ],
           }],
           ['linux_use_heapchecker==1', {
@@ -1078,7 +842,7 @@
           'GCC_DYNAMIC_NO_PIC': 'NO',               # No -mdynamic-no-pic
                                                     # (Equivalent to -fPIC)
           'GCC_ENABLE_CPP_EXCEPTIONS': 'NO',        # -fno-exceptions
-          'GCC_ENABLE_CPP_RTTI': 'NO',              # -fno-rtti
+          'GCC_ENABLE_CPP_RTTI': 'YES',             # -frtti
           'GCC_ENABLE_PASCAL_STRINGS': 'NO',        # No -mpascal-strings
           # GCC_INLINES_ARE_PRIVATE_EXTERN maps to -fvisibility-inlines-hidden
           'GCC_INLINES_ARE_PRIVATE_EXTERN': 'YES',
@@ -1106,51 +870,6 @@
           ['_mac_bundle', {
             'xcode_settings': {'OTHER_LDFLAGS': ['-Wl,-ObjC']},
           }],
-          ['_type=="executable" or _type=="shared_library"', {
-            'target_conditions': [
-              ['mac_real_dsym == 1', {
-                # To get a real .dSYM bundle produced by dsymutil, set the
-                # debug information format to dwarf-with-dsym.  Since
-                # strip_from_xcode will not be used, set Xcode to do the
-                # stripping as well.
-                'configurations': {
-                  'Release_Base': {
-                    'xcode_settings': {
-                      'DEBUG_INFORMATION_FORMAT': 'dwarf-with-dsym',
-                      'DEPLOYMENT_POSTPROCESSING': 'YES',
-                      'STRIP_INSTALLED_PRODUCT': 'YES',
-                      'target_conditions': [
-                        ['_type=="shared_library"', {
-                          # The Xcode default is to strip debugging symbols
-                          # only (-S).  Local symbols should be stripped as
-                          # well, which will be handled by -x.  Xcode will
-                          # continue to insert -S when stripping even when
-                          # additional flags are added with STRIPFLAGS.
-                          'STRIPFLAGS': '-x',
-                        }],  # _type=="shared_library"
-                      ],  # target_conditions
-                    },  # xcode_settings
-                  },  # configuration "Release"
-                },  # configurations
-              }, {  # mac_real_dsym != 1
-                # To get a fast fake .dSYM bundle, use a post-build step to
-                # produce the .dSYM and strip the executable.  strip_from_xcode
-                # only operates in the Release configuration.
-                'postbuilds': [
-                  {
-                    'variables': {
-                      # Define strip_from_xcode in a variable ending in _path
-                      # so that gyp understands it's a path and performs proper
-                      # relativization during dict merging.
-                      'strip_from_xcode_path': 'mac/strip_from_xcode',
-                    },
-                    'postbuild_name': 'Strip If Needed',
-                    'action': ['<(strip_from_xcode_path)'],
-                  },
-                ],  # postbuilds
-              }],  # mac_real_dsym
-            ],  # target_conditions
-          }],  # _type=="executable" or _type=="shared_library"
         ],  # target_conditions
       },  # target_defaults
     }],  # OS=="mac"
@@ -1174,7 +893,9 @@
           '$(VSInstallDir)/VC/atlmfc/include',
         ],
         'msvs_cygwin_dirs': ['<(DEPTH)/third_party/cygwin'],
-        'msvs_disabled_warnings': [4396, 4503, 4819],
+        'msvs_disabled_warnings': [
+          4100, 4127, 4396, 4503, 4512, 4819, 4995, 4702
+        ],
         'msvs_settings': {
           'VCCLCompilerTool': {
             'MinimalRebuild': 'false',
@@ -1182,7 +903,7 @@
             'BufferSecurityCheck': 'true',
             'EnableFunctionLevelLinking': 'true',
             'RuntimeTypeInfo': 'false',
-            'WarningLevel': '3',
+            'WarningLevel': '4',
             'WarnAsError': 'true',
             'DebugInformationFormat': '3',
             'conditions': [
@@ -1322,9 +1043,3 @@
     'SYMROOT': '<(DEPTH)/xcodebuild',
   },
 }
-
-# Local Variables:
-# tab-width:2
-# indent-tabs-mode:nil
-# End:
-# vim: set expandtab tabstop=2 shiftwidth=2:

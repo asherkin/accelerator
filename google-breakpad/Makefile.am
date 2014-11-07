@@ -64,17 +64,50 @@ endif
 # Specify include paths for ac macros
 ACLOCAL_AMFLAGS = -I m4
 
+# License file is called LICENSE not COPYING
+AUTOMAKE_OPTIONS = foreign
+
 ## Documentation
 docdir = $(prefix)/share/doc/$(PACKAGE)-$(VERSION)
 
 dist_doc_DATA = \
 	AUTHORS \
-	COPYING \
 	ChangeLog \
 	INSTALL \
+	LICENSE \
 	NEWS \
 	README
 
+## Headers
+if LINUX_HOST
+includeclhdir = $(includedir)/$(PACKAGE)/client/linux/handler
+includeclh_HEADERS = $(top_srcdir)/src/client/linux/handler/*.h
+
+includeclmdir = $(includedir)/$(PACKAGE)/client/linux/minidump_writer
+includeclm_HEADERS = $(top_srcdir)/src/client/linux/minidump_writer/*.h
+
+includeclcdir = $(includedir)/$(PACKAGE)/client/linux/crash_generation
+includeclc_HEADERS = $(top_srcdir)/src/client/linux/crash_generation/*.h
+
+includelssdir = $(includedir)/$(PACKAGE)/third_party/lss
+includelss_HEADERS = $(top_srcdir)/src/third_party/lss/*.h
+
+includecldir = $(includedir)/$(PACKAGE)/common/linux
+includecl_HEADERS = $(top_srcdir)/src/common/linux/*.h
+endif
+
+includegbcdir = $(includedir)/$(PACKAGE)/google_breakpad/common
+includegbc_HEADERS = $(top_srcdir)/src/google_breakpad/common/*.h
+
+includecdir = $(includedir)/$(PACKAGE)/common
+includec_HEADERS = $(top_srcdir)/src/common/*.h
+
+includepdir = $(includedir)/$(PACKAGE)/processor
+includep_HEADERS = $(top_srcdir)/src/processor/*.h
+
+## pkgconfig files
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA =
 
 ## Libraries
 noinst_LIBRARIES =
@@ -84,18 +117,24 @@ check_PROGRAMS =
 
 if !DISABLE_PROCESSOR
 lib_LIBRARIES += src/libbreakpad.a
+pkgconfig_DATA += breakpad.pc
 noinst_LIBRARIES += src/third_party/libdisasm/libdisasm.a
 endif
 
 if LINUX_HOST
 lib_LIBRARIES += src/client/linux/libbreakpad_client.a
+pkgconfig_DATA += breakpad-client.pc
 
 src_client_linux_libbreakpad_client_a_SOURCES = \
 	src/client/linux/crash_generation/crash_generation_client.cc \
 	src/client/linux/crash_generation/crash_generation_server.cc \
+	src/client/linux/dump_writer_common/seccomp_unwinder.cc \
+	src/client/linux/dump_writer_common/thread_info.cc \
+	src/client/linux/dump_writer_common/ucontext_reader.cc \
 	src/client/linux/handler/exception_handler.cc \
 	src/client/linux/handler/minidump_descriptor.cc \
 	src/client/linux/log/log.cc \
+	src/client/linux/microdump_writer/microdump_writer.cc \
 	src/client/linux/minidump_writer/linux_dumper.cc \
 	src/client/linux/minidump_writer/linux_ptrace_dumper.cc \
 	src/client/linux/minidump_writer/minidump_writer.cc \
@@ -124,11 +163,15 @@ src_libbreakpad_a_SOURCES = \
 	src/google_breakpad/processor/call_stack.h \
 	src/google_breakpad/processor/code_module.h \
 	src/google_breakpad/processor/code_modules.h \
+	src/google_breakpad/processor/dump_context.h \
+	src/google_breakpad/processor/dump_object.h \
 	src/google_breakpad/processor/exploitability.h \
 	src/google_breakpad/processor/fast_source_line_resolver.h \
 	src/google_breakpad/processor/memory_region.h \
+        src/google_breakpad/processor/microdump_processor.h \
 	src/google_breakpad/processor/minidump.h \
 	src/google_breakpad/processor/minidump_processor.h \
+	src/google_breakpad/processor/process_result.h \
 	src/google_breakpad/processor/process_state.h \
 	src/google_breakpad/processor/source_line_resolver_base.h \
 	src/google_breakpad/processor/source_line_resolver_interface.h \
@@ -154,7 +197,11 @@ src_libbreakpad_a_SOURCES = \
 	src/processor/contained_range_map.h \
 	src/processor/disassembler_x86.h \
 	src/processor/disassembler_x86.cc \
+	src/processor/dump_context.cc \
+	src/processor/dump_object.cc \
 	src/processor/exploitability.cc \
+	src/processor/exploitability_linux.h \
+	src/processor/exploitability_linux.cc \
 	src/processor/exploitability_win.h \
 	src/processor/exploitability_win.cc \
 	src/processor/fast_source_line_resolver_types.h \
@@ -164,6 +211,7 @@ src_libbreakpad_a_SOURCES = \
 	src/processor/logging.cc \
 	src/processor/map_serializers-inl.h \
 	src/processor/map_serializers.h \
+        src/processor/microdump_processor.cc \
 	src/processor/minidump.cc \
 	src/processor/minidump_processor.cc \
 	src/processor/module_comparer.cc \
@@ -185,12 +233,19 @@ src_libbreakpad_a_SOURCES = \
 	src/processor/windows_frame_info.h \
 	src/processor/source_line_resolver_base_types.h \
 	src/processor/source_line_resolver_base.cc \
+	src/processor/stack_frame_cpu.cc \
 	src/processor/stack_frame_symbolizer.cc \
 	src/processor/stackwalker.cc \
 	src/processor/stackwalker_amd64.cc \
 	src/processor/stackwalker_amd64.h \
 	src/processor/stackwalker_arm.cc \
 	src/processor/stackwalker_arm.h \
+	src/processor/stackwalker_arm64.cc \
+	src/processor/stackwalker_arm64.h \
+	src/processor/stackwalker_address_list.cc \
+	src/processor/stackwalker_address_list.h \
+	src/processor/stackwalker_mips.cc \
+	src/processor/stackwalker_mips.h \
 	src/processor/stackwalker_ppc.cc \
 	src/processor/stackwalker_ppc.h \
 	src/processor/stackwalker_ppc64.cc \
@@ -276,6 +331,7 @@ check_PROGRAMS += \
 	src/processor/exploitability_unittest \
 	src/processor/fast_source_line_resolver_unittest \
 	src/processor/map_serializers_unittest \
+        src/processor/microdump_processor_unittest \
 	src/processor/minidump_processor_unittest \
 	src/processor/minidump_unittest \
 	src/processor/static_address_map_unittest \
@@ -287,6 +343,9 @@ check_PROGRAMS += \
 	src/processor/range_map_unittest \
 	src/processor/stackwalker_amd64_unittest \
 	src/processor/stackwalker_arm_unittest \
+	src/processor/stackwalker_arm64_unittest \
+	src/processor/stackwalker_address_list_unittest \
+	src/processor/stackwalker_mips_unittest \
 	src/processor/stackwalker_x86_unittest \
 	src/processor/synth_minidump_unittest
 endif
@@ -322,18 +381,28 @@ endif
 TESTS = $(check_PROGRAMS) $(check_SCRIPTS)
 
 if ANDROID_HOST
-# Wrapper script to run unit test programs on a connected Android device.
-TESTS_ENVIRONMENT = $(top_srcdir)/android/test-shell.sh
+# Since Autotools 1.2, tests are run through a special "test driver" script.
+# Unfortunately, it's not possible anymore to specify an alternative shell to
+# run them on connected devices, so use a slightly modified version of the
+# driver for Android.
+LOG_DRIVER = $(top_srcdir)/android/test-driver
 else
-TESTS_ENVIRONMENT =
+# The default Autotools test driver script.
+LOG_DRIVER = $(top_srcdir)/autotools/test-driver
 endif
 
 if LINUX_HOST
 src_client_linux_linux_dumper_unittest_helper_SOURCES = \
 	src/client/linux/minidump_writer/linux_dumper_unittest_helper.cc
-src_client_linux_linux_dumper_unittest_helper_CXXFLAGS=$(PTHREAD_CFLAGS)
 src_client_linux_linux_dumper_unittest_helper_LDFLAGS=$(PTHREAD_CFLAGS)
 src_client_linux_linux_dumper_unittest_helper_CC=$(PTHREAD_CC)
+if ANDROID_HOST
+# On Android PTHREAD_CFLAGS is empty, and adding src/common/android/include
+# to the include path is necessary to build this program.
+src_client_linux_linux_dumper_unittest_helper_CXXFLAGS=$(AM_CXXFLAGS)
+else
+src_client_linux_linux_dumper_unittest_helper_CXXFLAGS=$(PTHREAD_CFLAGS)
+endif
 
 src_client_linux_linux_client_unittest_shlib_SOURCES = \
 	src/client/linux/handler/exception_handler_unittest.cc \
@@ -355,6 +424,8 @@ src_client_linux_linux_client_unittest_shlib_SOURCES = \
 	src/testing/gtest/src/gtest_main.cc \
 	src/testing/src/gmock-all.cc \
 	src/processor/basic_code_modules.cc \
+	src/processor/dump_context.cc \
+	src/processor/dump_object.cc \
 	src/processor/logging.cc \
 	src/processor/minidump.cc \
 	src/processor/pathname_stripper.cc
@@ -373,10 +444,14 @@ src_client_linux_linux_client_unittest_shlib_LDFLAGS = \
 	-shared \
 	-Wl,-h,linux_client_unittest_shlib
 src_client_linux_linux_client_unittest_shlib_LDADD = \
+	src/client/linux/crash_generation/crash_generation_client.o \
+	src/client/linux/dump_writer_common/seccomp_unwinder.o \
+	src/client/linux/dump_writer_common/thread_info.o \
+	src/client/linux/dump_writer_common/ucontext_reader.o \
 	src/client/linux/handler/exception_handler.o \
 	src/client/linux/handler/minidump_descriptor.o \
 	src/client/linux/log/log.o \
-	src/client/linux/crash_generation/crash_generation_client.o \
+	src/client/linux/microdump_writer/microdump_writer.o \
 	src/client/linux/minidump_writer/linux_dumper.o \
 	src/client/linux/minidump_writer/linux_ptrace_dumper.o \
 	src/client/linux/minidump_writer/minidump_writer.o \
@@ -437,6 +512,7 @@ src_tools_linux_dump_syms_dump_syms_SOURCES = \
 	src/common/dwarf/bytereader.cc \
 	src/common/dwarf/dwarf2diehandler.cc \
 	src/common/dwarf/dwarf2reader.cc \
+	src/common/linux/crc32.cc \
 	src/common/linux/dump_symbols.cc \
 	src/common/linux/elf_symbols_to_module.cc \
 	src/common/linux/elfutils.cc \
@@ -485,6 +561,7 @@ src_common_dumper_unittest_SOURCES = \
 	src/common/dwarf/dwarf2reader.cc \
 	src/common/dwarf/dwarf2reader_cfi_unittest.cc \
 	src/common/dwarf/dwarf2reader_die_unittest.cc \
+	src/common/linux/crc32.cc \
 	src/common/linux/dump_symbols.cc \
 	src/common/linux/dump_symbols_unittest.cc \
 	src/common/linux/elf_core_dump.cc \
@@ -611,19 +688,27 @@ src_processor_exploitability_unittest_LDADD = \
 	src/processor/process_state.o \
 	src/processor/disassembler_x86.o \
 	src/processor/exploitability.o \
+	src/processor/exploitability_linux.o \
 	src/processor/exploitability_win.o \
 	src/processor/basic_code_modules.o \
 	src/processor/basic_source_line_resolver.o \
 	src/processor/call_stack.o \
 	src/processor/cfi_frame_info.o \
+	src/processor/dump_context.o \
+	src/processor/dump_object.o \
 	src/processor/logging.o \
 	src/processor/minidump.o \
 	src/processor/pathname_stripper.o \
+	src/processor/simple_symbol_supplier.o \
 	src/processor/source_line_resolver_base.o \
+	src/processor/stack_frame_cpu.o \
 	src/processor/stack_frame_symbolizer.o \
 	src/processor/stackwalker.o \
 	src/processor/stackwalker_amd64.o \
 	src/processor/stackwalker_arm.o \
+	src/processor/stackwalker_arm64.o \
+	src/processor/stackwalker_address_list.o \
+	src/processor/stackwalker_mips.o \
 	src/processor/stackwalker_ppc.o \
 	src/processor/stackwalker_ppc64.o \
 	src/processor/stackwalker_sparc.o \
@@ -685,6 +770,19 @@ src_processor_map_serializers_unittest_LDADD = \
 	src/processor/pathname_stripper.o \
 	$(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
 
+src_processor_microdump_processor_unittest_SOURCES = \
+  src/processor/microdump_processor_unittest.cc \
+  src/testing/gtest/src/gtest-all.cc \
+  src/testing/src/gmock-all.cc
+src_processor_microdump_processor_unittest_CPPFLAGS = \
+  -I$(top_srcdir)/src \
+  -I$(top_srcdir)/src/testing/include \
+  -I$(top_srcdir)/src/testing/gtest/include \
+  -I$(top_srcdir)/src/testing/gtest \
+  -I$(top_srcdir)/src/testing
+src_processor_microdump_processor_unittest_LDADD = \
+  $(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
+
 src_processor_minidump_processor_unittest_SOURCES = \
 	src/processor/minidump_processor_unittest.cc \
 	src/testing/gtest/src/gtest-all.cc \
@@ -701,7 +799,10 @@ src_processor_minidump_processor_unittest_LDADD = \
 	src/processor/call_stack.o \
 	src/processor/cfi_frame_info.o \
 	src/processor/disassembler_x86.o \
+	src/processor/dump_context.o \
+	src/processor/dump_object.o \
 	src/processor/exploitability.o \
+	src/processor/exploitability_linux.o \
 	src/processor/exploitability_win.o \
 	src/processor/logging.o \
 	src/processor/minidump_processor.o \
@@ -709,10 +810,14 @@ src_processor_minidump_processor_unittest_LDADD = \
 	src/processor/pathname_stripper.o \
 	src/processor/process_state.o \
 	src/processor/source_line_resolver_base.o \
+	src/processor/stack_frame_cpu.o \
 	src/processor/stack_frame_symbolizer.o \
 	src/processor/stackwalker.o \
 	src/processor/stackwalker_amd64.o \
 	src/processor/stackwalker_arm.o \
+	src/processor/stackwalker_arm64.o \
+	src/processor/stackwalker_address_list.o \
+	src/processor/stackwalker_mips.o \
 	src/processor/stackwalker_ppc.o \
 	src/processor/stackwalker_ppc64.o \
 	src/processor/stackwalker_sparc.o \
@@ -736,6 +841,8 @@ src_processor_minidump_unittest_CPPFLAGS = \
 	-I$(top_srcdir)/src/testing
 src_processor_minidump_unittest_LDADD = \
 	src/processor/basic_code_modules.o \
+	src/processor/dump_context.o \
+	src/processor/dump_object.o \
 	src/processor/logging.o \
 	src/processor/minidump.o \
 	src/processor/pathname_stripper.o \
@@ -829,15 +936,20 @@ src_processor_stackwalker_selftest_LDADD = \
 	src/processor/call_stack.o \
 	src/processor/disassembler_x86.o \
 	src/processor/exploitability.o \
+	src/processor/exploitability_linux.o \
 	src/processor/exploitability_win.o \
 	src/processor/logging.o \
 	src/processor/minidump.o \
 	src/processor/pathname_stripper.o \
 	src/processor/source_line_resolver_base.o \
+	src/processor/stack_frame_cpu.o \
 	src/processor/stack_frame_symbolizer.o \
 	src/processor/stackwalker.o \
 	src/processor/stackwalker_amd64.o \
 	src/processor/stackwalker_arm.o \
+	src/processor/stackwalker_arm64.o \
+	src/processor/stackwalker_address_list.o \
+	src/processor/stackwalker_mips.o \
 	src/processor/stackwalker_ppc.o \
 	src/processor/stackwalker_ppc64.o \
 	src/processor/stackwalker_sparc.o \
@@ -871,6 +983,54 @@ src_processor_stackwalker_arm_unittest_LDADD = \
 	src/libbreakpad.a \
 	$(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
 src_processor_stackwalker_arm_unittest_CPPFLAGS = \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/testing/include \
+	-I$(top_srcdir)/src/testing/gtest/include \
+	-I$(top_srcdir)/src/testing/gtest \
+	-I$(top_srcdir)/src/testing
+
+src_processor_stackwalker_arm64_unittest_SOURCES = \
+	src/common/test_assembler.cc \
+	src/processor/stackwalker_arm64_unittest.cc \
+	src/testing/gtest/src/gtest-all.cc \
+	src/testing/gtest/src/gtest_main.cc \
+	src/testing/src/gmock-all.cc
+src_processor_stackwalker_arm64_unittest_LDADD = \
+	src/libbreakpad.a \
+	$(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
+src_processor_stackwalker_arm64_unittest_CPPFLAGS = \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/testing/include \
+	-I$(top_srcdir)/src/testing/gtest/include \
+	-I$(top_srcdir)/src/testing/gtest \
+	-I$(top_srcdir)/src/testing
+
+src_processor_stackwalker_address_list_unittest_SOURCES = \
+	src/common/test_assembler.cc \
+	src/processor/stackwalker_address_list_unittest.cc \
+	src/testing/gtest/src/gtest-all.cc \
+	src/testing/gtest/src/gtest_main.cc \
+	src/testing/src/gmock-all.cc
+src_processor_stackwalker_address_list_unittest_LDADD = \
+	src/libbreakpad.a \
+	$(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
+src_processor_stackwalker_address_list_unittest_CPPFLAGS = \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/testing/include \
+	-I$(top_srcdir)/src/testing/gtest/include \
+	-I$(top_srcdir)/src/testing/gtest \
+	-I$(top_srcdir)/src/testing
+
+src_processor_stackwalker_mips_unittest_SOURCES = \
+	src/common/test_assembler.cc \
+	src/processor/stackwalker_mips_unittest.cc \
+	src/testing/gtest/src/gtest-all.cc \
+	src/testing/gtest/src/gtest_main.cc \
+	src/testing/src/gmock-all.cc
+src_processor_stackwalker_mips_unittest_LDADD = \
+	src/libbreakpad.a \
+	$(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
+src_processor_stackwalker_mips_unittest_CPPFLAGS = \
 	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/testing/include \
 	-I$(top_srcdir)/src/testing/gtest/include \
@@ -933,6 +1093,8 @@ src_processor_minidump_dump_SOURCES = \
 	src/processor/minidump_dump.cc
 src_processor_minidump_dump_LDADD = \
 	src/processor/basic_code_modules.o \
+	src/processor/dump_context.o \
+	src/processor/dump_object.o \
 	src/processor/logging.o \
 	src/processor/minidump.o \
 	src/processor/pathname_stripper.o
@@ -946,7 +1108,10 @@ src_processor_minidump_stackwalk_LDADD = \
 	src/processor/call_stack.o \
 	src/processor/cfi_frame_info.o \
 	src/processor/disassembler_x86.o \
+	src/processor/dump_context.o \
+	src/processor/dump_object.o \
 	src/processor/exploitability.o \
+	src/processor/exploitability_linux.o \
 	src/processor/exploitability_win.o \
 	src/processor/logging.o \
 	src/processor/minidump.o \
@@ -955,10 +1120,14 @@ src_processor_minidump_stackwalk_LDADD = \
 	src/processor/process_state.o \
 	src/processor/simple_symbol_supplier.o \
 	src/processor/source_line_resolver_base.o \
+	src/processor/stack_frame_cpu.o \
 	src/processor/stack_frame_symbolizer.o \
 	src/processor/stackwalker.o \
 	src/processor/stackwalker_amd64.o \
 	src/processor/stackwalker_arm.o \
+	src/processor/stackwalker_arm64.o \
+	src/processor/stackwalker_address_list.o \
+	src/processor/stackwalker_mips.o \
 	src/processor/stackwalker_ppc.o \
 	src/processor/stackwalker_ppc64.o \
 	src/processor/stackwalker_sparc.o \
@@ -1021,6 +1190,7 @@ EXTRA_DIST = \
 	src/client/windows/sender/crash_report_sender.vcproj \
 	src/common/convert_UTF.c \
 	src/common/convert_UTF.h \
+	src/common/linux/crc32.cc \
 	src/common/linux/dump_symbols.cc \
 	src/common/linux/dump_symbols.h \
 	src/common/linux/elf_symbols_to_module.cc \

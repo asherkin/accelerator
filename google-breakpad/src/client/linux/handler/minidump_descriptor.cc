@@ -35,8 +35,12 @@
 
 namespace google_breakpad {
 
+//static
+const MinidumpDescriptor::MicrodumpOnConsole kMicrodumpOnConsole = {};
+
 MinidumpDescriptor::MinidumpDescriptor(const MinidumpDescriptor& descriptor)
-    : fd_(descriptor.fd_),
+    : mode_(descriptor.mode_),
+      fd_(descriptor.fd_),
       directory_(descriptor.directory_),
       c_path_(NULL),
       size_limit_(descriptor.size_limit_) {
@@ -50,6 +54,7 @@ MinidumpDescriptor& MinidumpDescriptor::operator=(
     const MinidumpDescriptor& descriptor) {
   assert(descriptor.path_.empty());
 
+  mode_ = descriptor.mode_;
   fd_ = descriptor.fd_;
   directory_ = descriptor.directory_;
   path_.clear();
@@ -63,7 +68,7 @@ MinidumpDescriptor& MinidumpDescriptor::operator=(
 }
 
 void MinidumpDescriptor::UpdatePath() {
-  assert(fd_ == -1 && !directory_.empty());
+  assert(mode_ == kWriteMinidumpToFile && !directory_.empty());
 
   GUID guid;
   char guid_str[kGUIDStringLength + 1];
@@ -72,7 +77,7 @@ void MinidumpDescriptor::UpdatePath() {
   }
 
   path_.clear();
-  path_ = directory_ + "/" + guid_str + ".dmp";  
+  path_ = directory_ + "/" + guid_str + ".dmp";
   c_path_ = path_.c_str();
 }
 

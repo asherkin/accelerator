@@ -54,7 +54,7 @@
 namespace google_breakpad {
 
 class CallStack;
-class MinidumpContext;
+class DumpContext;
 class StackFrameSymbolizer;
 
 using std::set;
@@ -68,22 +68,25 @@ class Stackwalker {
   // GetCallerFrame.  The frames are further processed to fill all available
   // data.  Returns true if the stackwalk completed, or false if it was
   // interrupted by SymbolSupplier::GetSymbolFile().
-  // Upon return, modules_without_symbols will be populated with pointers to
+  // Upon return, |modules_without_symbols| will be populated with pointers to
   // the code modules (CodeModule*) that DON'T have symbols.
-  // modules_without_symbols DOES NOT take ownership of the code modules.
+  // |modules_with_corrupt_symbols| will be populated with pointers to the
+  // modules which have corrupt symbols.  |modules_without_symbols| and
+  // |modules_with_corrupt_symbols| DO NOT take ownership of the code modules.
   // The lifetime of these code modules is the same as the lifetime of the
   // CodeModules passed to the StackWalker constructor (which currently
   // happens to be the lifetime of the Breakpad's ProcessingState object).
   // There is a check for duplicate modules so no duplicates are expected.
   bool Walk(CallStack* stack,
-            vector<const CodeModule*>* modules_without_symbols);
+            vector<const CodeModule*>* modules_without_symbols,
+            vector<const CodeModule*>* modules_with_corrupt_symbols);
 
   // Returns a new concrete subclass suitable for the CPU that a stack was
   // generated on, according to the CPU type indicated by the context
   // argument.  If no suitable concrete subclass exists, returns NULL.
   static Stackwalker* StackwalkerForCPU(
      const SystemInfo* system_info,
-     MinidumpContext* context,
+     DumpContext* context,
      MemoryRegion* memory,
      const CodeModules* modules,
      StackFrameSymbolizer* resolver_helper);
@@ -93,6 +96,10 @@ class Stackwalker {
     max_frames_set_ = true;
   }
   static uint32_t max_frames() { return max_frames_; }
+
+  static void set_max_frames_scanned(uint32_t max_frames_scanned) {
+    max_frames_scanned_ = max_frames_scanned;
+  }
 
  protected:
   // system_info identifies the operating system, NULL or empty if unknown.
@@ -126,9 +133,16 @@ class Stackwalker {
   template<typename InstructionType>
   bool ScanForReturnAddress(InstructionType location_start,
                             InstructionType* location_found,
-                            InstructionType* ip_found) {
+                            InstructionType* ip_found,
+                            bool is_context_frame) {
+    // When searching for the caller of the context frame,
+    // allow the scanner to look farther down the stack.
+    const int search_words = is_context_frame ?
+      kRASearchWords * 4 :
+      kRASearchWords;
+
     return ScanForReturnAddress(location_start, location_found, ip_found,
-                                kRASearchWords);
+                                search_words);
   }
 
   // Scan the stack starting at location_start, looking for an address
@@ -193,8 +207,11 @@ class Stackwalker {
   // return NULL on failure or when there are no more caller frames (when
   // the end of the stack has been reached).  GetCallerFrame allocates a new
   // StackFrame (or StackFrame subclass), ownership of which is taken by
-  // the caller.
-  virtual StackFrame* GetCallerFrame(const CallStack* stack) = 0;
+  // the caller.  |stack_scan_allowed| controls whether stack scanning is
+  // an allowable frame-recovery method, since it is desirable to be able to
+  // disable stack scanning in performance-critical use cases.
+  virtual StackFrame* GetCallerFrame(const CallStack* stack,
+                                     bool stack_scan_allowed) = 0;
 
   // The maximum number of frames Stackwalker will walk through.
   // This defaults to 1024 to prevent infinite loops.
@@ -204,6 +221,12 @@ class Stackwalker {
   // it affects whether or not an error message is printed in the case
   // where an unwind got stopped by the limit.
   static bool max_frames_set_;
+
+  // The maximum number of stack-scanned and otherwise untrustworthy
+  // frames allowed.  Stack-scanning can be expensive, so the option to
+  // disable or limit it is helpful in cases where unwind performance is
+  // important.  This defaults to 1024, the same as max_frames_.
+  static uint32_t max_frames_scanned_;
 };
 
 }  // namespace google_breakpad

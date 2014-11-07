@@ -57,6 +57,8 @@
 #include "common/dwarf_cfi_to_module.h"
 #include "common/dwarf_cu_to_module.h"
 #include "common/dwarf_line_to_module.h"
+#include "common/linux/crc32.h"
+#include "common/linux/eintr_wrapper.h"
 #include "common/linux/elfutils.h"
 #include "common/linux/elfutils-inl.h"
 #include "common/linux/elf_symbols_to_module.h"
@@ -87,6 +89,11 @@ using google_breakpad::Module;
 using google_breakpad::StabsToModule;
 #endif
 using google_breakpad::scoped_ptr;
+
+// Define AARCH64 ELF architecture if host machine does not include this define.
+#ifndef EM_AARCH64
+#define EM_AARCH64      183
+#endif
 
 //
 // FDWrapper
@@ -141,7 +148,7 @@ class MmapWrapper {
 
  private:
   bool is_set_;
-  void *base_;
+  void* base_;
   size_t size_;
 };
 
@@ -204,8 +211,8 @@ class DumperLineToModule: public DwarfCUToModule::LineToModuleHandler {
   void StartCompilationUnit(const string& compilation_dir) {
     compilation_dir_ = compilation_dir;
   }
-  void ReadProgram(const char *program, uint64 length,
-                   Module *module, std::vector<Module::Line> *lines) {
+  void ReadProgram(const char* program, uint64 length,
+                   Module* module, std::vector<Module::Line>* lines) {
     DwarfLineToModule handler(module, compilation_dir_, lines);
     dwarf2reader::LineInfo parser(program, length, byte_reader_, &handler);
     parser.Start();
@@ -291,6 +298,12 @@ bool DwarfCFIRegisterNames(const typename ElfClass::Ehdr* elf_header,
     case EM_ARM:
       *register_names = DwarfCFIToModule::RegisterNames::ARM();
       return true;
+    case EM_AARCH64:
+      *register_names = DwarfCFIToModule::RegisterNames::ARM64();
+      return true;
+    case EM_MIPS:
+      *register_names = DwarfCFIToModule::RegisterNames::MIPS();
+      return true;
     case EM_X86_64:
       *register_names = DwarfCFIToModule::RegisterNames::X86_64();
       return true;
@@ -366,7 +379,7 @@ bool LoadELF(const string& obj_file, MmapWrapper* map_wrapper,
             obj_file.c_str(), strerror(errno));
     return false;
   }
-  void *obj_base = mmap(NULL, st.st_size,
+  void* obj_base = mmap(NULL, st.st_size,
                         PROT_READ | PROT_WRITE, MAP_PRIVATE, obj_fd, 0);
   if (obj_base == MAP_FAILED) {
     fprintf(stderr, "Failed to mmap ELF file '%s': %s\n",
@@ -402,19 +415,19 @@ bool ElfEndianness(const typename ElfClass::Ehdr* elf_header,
 
 // Read the .gnu_debuglink and get the debug file name. If anything goes
 // wrong, return an empty string.
-template<typename ElfClass>
 string ReadDebugLink(const char* debuglink,
-                     size_t debuglink_size,
+                     const size_t debuglink_size,
+                     const bool big_endian,
                      const string& obj_file,
                      const std::vector<string>& debug_dirs) {
-  size_t debuglink_len = strlen(debuglink) + 5;  // '\0' + CRC32.
-  debuglink_len = 4 * ((debuglink_len + 3) / 4);  // Round to nearest 4 bytes.
+  size_t debuglink_len = strlen(debuglink) + 5;  // Include '\0' + CRC32.
+  debuglink_len = 4 * ((debuglink_len + 3) / 4);  // Round up to 4 bytes.
 
   // Sanity check.
   if (debuglink_len != debuglink_size) {
     fprintf(stderr, "Mismatched .gnu_debuglink string / section size: "
             "%zx %zx\n", debuglink_len, debuglink_size);
-    return "";
+    return string();
   }
 
   bool found = false;
@@ -425,10 +438,39 @@ string ReadDebugLink(const char* debuglink,
     const string& debug_dir = *it;
     debuglink_path = debug_dir + "/" + debuglink;
     debuglink_fd = open(debuglink_path.c_str(), O_RDONLY);
-    if (debuglink_fd >= 0) {
-      found = true;
-      break;
+    if (debuglink_fd < 0)
+      continue;
+
+    FDWrapper debuglink_fd_wrapper(debuglink_fd);
+
+    // The CRC is the last 4 bytes in |debuglink|.
+    const dwarf2reader::Endianness endianness = big_endian ?
+        dwarf2reader::ENDIANNESS_BIG : dwarf2reader::ENDIANNESS_LITTLE;
+    dwarf2reader::ByteReader byte_reader(endianness);
+    uint32_t expected_crc =
+        byte_reader.ReadFourBytes(&debuglink[debuglink_size - 4]);
+
+    uint32_t actual_crc = 0;
+    while (true) {
+      const size_t kReadSize = 4096;
+      char buf[kReadSize];
+      ssize_t bytes_read = HANDLE_EINTR(read(debuglink_fd, &buf, kReadSize));
+      if (bytes_read < 0) {
+        fprintf(stderr, "Error reading debug ELF file %s.\n",
+                debuglink_path.c_str());
+        return string();
+      }
+      if (bytes_read == 0)
+        break;
+      actual_crc = google_breakpad::UpdateCrc32(actual_crc, buf, bytes_read);
     }
+    if (actual_crc != expected_crc) {
+      fprintf(stderr, "Error reading debug ELF file - CRC32 mismatch: %s\n",
+              debuglink_path.c_str());
+      continue;
+    }
+    found = true;
+    break;
   }
 
   if (!found) {
@@ -438,12 +480,8 @@ string ReadDebugLink(const char* debuglink,
       const string debug_dir = *it;
       fprintf(stderr, "  %s/%s\n", debug_dir.c_str(), debuglink);
     }
-    return "";
+    return string();
   }
-
-  FDWrapper debuglink_fd_wrapper(debuglink_fd);
-  // TODO(thestig) check the CRC-32 at the end of the .gnu_debuglink
-  // section.
 
   return debuglink_path;
 }
@@ -534,6 +572,7 @@ bool LoadSymbols(const string& obj_file,
   typedef typename ElfClass::Addr Addr;
   typedef typename ElfClass::Phdr Phdr;
   typedef typename ElfClass::Shdr Shdr;
+  typedef typename ElfClass::Word Word;
 
   Addr loading_addr = GetLoadingAddress<ElfClass>(
       GetOffset<ElfClass, Phdr>(elf_header, elf_header->e_phoff),
@@ -541,6 +580,8 @@ bool LoadSymbols(const string& obj_file,
   module->SetLoadAddress(loading_addr);
   info->set_loading_addr(loading_addr, obj_file);
 
+  Word debug_section_type =
+      elf_header->e_machine == EM_MIPS ? SHT_MIPS_DWARF : SHT_PROGBITS;
   const Shdr* sections =
       GetOffset<ElfClass, Shdr>(elf_header, elf_header->e_shoff);
   const Shdr* section_names = sections + elf_header->e_shstrndx;
@@ -574,7 +615,7 @@ bool LoadSymbols(const string& obj_file,
 
     // Look for DWARF debugging information, and load it if present.
     const Shdr* dwarf_section =
-      FindElfSectionByName<ElfClass>(".debug_info", SHT_PROGBITS,
+      FindElfSectionByName<ElfClass>(".debug_info", debug_section_type,
                                      sections, names, names_end,
                                      elf_header->e_shnum);
     if (dwarf_section) {
@@ -593,7 +634,7 @@ bool LoadSymbols(const string& obj_file,
     // Dwarf Call Frame Information (CFI) is actually independent from
     // the other DWARF debugging information, and can be used alone.
     const Shdr* dwarf_cfi_section =
-        FindElfSectionByName<ElfClass>(".debug_frame", SHT_PROGBITS,
+        FindElfSectionByName<ElfClass>(".debug_frame", debug_section_type,
                                        sections, names, names_end,
                                        elf_header->e_shnum);
     if (dwarf_cfi_section) {
@@ -648,13 +689,17 @@ bool LoadSymbols(const string& obj_file,
                                            names_end, elf_header->e_shnum);
       if (gnu_debuglink_section) {
         if (!info->debug_dirs().empty()) {
+          found_debug_info_section = true;
+
           const char* debuglink_contents =
               GetOffset<ElfClass, char>(elf_header,
                                         gnu_debuglink_section->sh_offset);
-          string debuglink_file
-              = ReadDebugLink<ElfClass>(debuglink_contents,
-                                        gnu_debuglink_section->sh_size,
-                                        obj_file, info->debug_dirs());
+          string debuglink_file =
+              ReadDebugLink(debuglink_contents,
+                            gnu_debuglink_section->sh_size,
+                            big_endian,
+                            obj_file,
+                            info->debug_dirs());
           info->set_debuglink_file(debuglink_file);
         } else {
           fprintf(stderr, ".gnu_debuglink section found in '%s', "
@@ -664,50 +709,45 @@ bool LoadSymbols(const string& obj_file,
         fprintf(stderr, "%s does not contain a .gnu_debuglink section.\n",
                 obj_file.c_str());
       }
-    } else {
-      if (options.symbol_data != ONLY_CFI) {
-        // The caller doesn't want to consult .gnu_debuglink.
-        // See if there are export symbols available.
-        const Shdr* dynsym_section =
-          FindElfSectionByName<ElfClass>(".dynsym", SHT_DYNSYM,
-                                         sections, names, names_end,
-                                         elf_header->e_shnum);
-        const Shdr* dynstr_section =
-          FindElfSectionByName<ElfClass>(".dynstr", SHT_STRTAB,
-                                         sections, names, names_end,
-                                         elf_header->e_shnum);
-        if (dynsym_section && dynstr_section) {
-          info->LoadedSection(".dynsym");
-
-          const uint8_t* dynsyms =
-              GetOffset<ElfClass, uint8_t>(elf_header,
-                                           dynsym_section->sh_offset);
-          const uint8_t* dynstrs =
-              GetOffset<ElfClass, uint8_t>(elf_header,
-                                           dynstr_section->sh_offset);
-          bool result =
-              ELFSymbolsToModule(dynsyms,
-                                 dynsym_section->sh_size,
-                                 dynstrs,
-                                 dynstr_section->sh_size,
-                                 big_endian,
-                                 ElfClass::kAddrSize,
-                                 module);
-          found_usable_info = found_usable_info || result;
-        }
-      }
-
-      // Return true if some usable information was found, since
-      // the caller doesn't want to use .gnu_debuglink.
-      return found_usable_info;
     }
-
-    // No debug info was found, let the user try again with .gnu_debuglink
-    // if present.
-    return false;
   }
 
-  return true;
+  if (options.symbol_data != ONLY_CFI) {
+    const Shdr* dynsym_section =
+      FindElfSectionByName<ElfClass>(".dynsym", SHT_DYNSYM,
+                                     sections, names, names_end,
+                                     elf_header->e_shnum);
+    const Shdr* dynstr_section =
+      FindElfSectionByName<ElfClass>(".dynstr", SHT_STRTAB,
+                                     sections, names, names_end,
+                                     elf_header->e_shnum);
+    if (dynsym_section && dynstr_section) {
+      info->LoadedSection(".dynsym");
+
+      const uint8_t* dynsyms =
+          GetOffset<ElfClass, uint8_t>(elf_header,
+                                       dynsym_section->sh_offset);
+      const uint8_t* dynstrs =
+          GetOffset<ElfClass, uint8_t>(elf_header,
+                                       dynstr_section->sh_offset);
+      bool result =
+          ELFSymbolsToModule(dynsyms,
+                             dynsym_section->sh_size,
+                             dynstrs,
+                             dynstr_section->sh_size,
+                             big_endian,
+                             ElfClass::kAddrSize,
+                             module);
+      found_usable_info = found_usable_info || result;
+    }
+  }
+
+  if (read_gnu_debug_link) {
+    return found_debug_info_section;
+  }
+
+  // Return true if some usable information was found
+  return found_usable_info;
 }
 
 // Return the breakpad symbol file identifier for the architecture of
@@ -719,6 +759,7 @@ const char* ElfArchitecture(const typename ElfClass::Ehdr* elf_header) {
   switch (arch) {
     case EM_386:        return "x86";
     case EM_ARM:        return "arm";
+    case EM_AARCH64:    return "arm64";
     case EM_MIPS:       return "mips";
     case EM_PPC64:      return "ppc64";
     case EM_PPC:        return "ppc";
@@ -753,7 +794,7 @@ string FormatIdentifier(unsigned char identifier[16]) {
 // last slash, or the whole filename if there are no slashes.
 string BaseFileName(const string &filename) {
   // Lots of copies!  basename's behavior is less than ideal.
-  char *c_filename = strdup(filename.c_str());
+  char* c_filename = strdup(filename.c_str());
   string base = basename(c_filename);
   free(c_filename);
   return base;

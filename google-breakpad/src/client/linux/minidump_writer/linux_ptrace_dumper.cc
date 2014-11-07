@@ -47,7 +47,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ptrace.h>
+#include <sys/uio.h>
 #include <sys/wait.h>
+
+#if defined(__i386)
+#include <cpuid.h>
+#endif
 
 #include "client/linux/minidump_writer/directory_reader.h"
 #include "client/linux/minidump_writer/line_reader.h"
@@ -182,6 +187,20 @@ bool LinuxPtraceDumper::GetThreadInfoByIndex(size_t index, ThreadInfo* info) {
   if (info->ppid == -1 || info->tgid == -1)
     return false;
 
+#ifdef PTRACE_GETREGSET
+  struct iovec io;
+  io.iov_base = &info->regs;
+  io.iov_len = sizeof(info->regs);
+  if (sys_ptrace(PTRACE_GETREGSET, tid, (void*)NT_PRSTATUS, (void*)&io) == -1) {
+    return false;
+  }
+
+  io.iov_base = &info->fpregs;
+  io.iov_len = sizeof(info->fpregs);
+  if (sys_ptrace(PTRACE_GETREGSET, tid, (void*)NT_FPREGSET, (void*)&io) == -1) {
+    return false;
+  }
+#else
   if (sys_ptrace(PTRACE_GETREGS, tid, NULL, &info->regs) == -1) {
     return false;
   }
@@ -189,11 +208,23 @@ bool LinuxPtraceDumper::GetThreadInfoByIndex(size_t index, ThreadInfo* info) {
   if (sys_ptrace(PTRACE_GETFPREGS, tid, NULL, &info->fpregs) == -1) {
     return false;
   }
+#endif
 
 #if defined(__i386)
-  if (sys_ptrace(PTRACE_GETFPXREGS, tid, NULL, &info->fpxregs) == -1)
-    return false;
+#if !defined(bit_FXSAVE)  // e.g. Clang
+#define bit_FXSAVE bit_FXSR
 #endif
+  // Detect if the CPU supports the FXSAVE/FXRSTOR instructions
+  int eax, ebx, ecx, edx;
+  __cpuid(1, eax, ebx, ecx, edx);
+  if (edx & bit_FXSAVE) {
+    if (sys_ptrace(PTRACE_GETFPXREGS, tid, NULL, &info->fpxregs) == -1) {
+      return false;
+    }
+  } else {
+    memset(&info->fpxregs, 0, sizeof(info->fpxregs));
+  }
+#endif  // defined(__i386)
 
 #if defined(__i386) || defined(__x86_64)
   for (unsigned i = 0; i < ThreadInfo::kNumDebugRegisters; ++i) {
@@ -208,6 +239,17 @@ bool LinuxPtraceDumper::GetThreadInfoByIndex(size_t index, ThreadInfo* info) {
   }
 #endif
 
+#if defined(__mips__)
+  for (int i = 0; i < 3; ++i) {
+    sys_ptrace(PTRACE_PEEKUSER, tid,
+               reinterpret_cast<void*>(DSP_BASE + (i * 2)), &info->hi[i]);
+    sys_ptrace(PTRACE_PEEKUSER, tid,
+               reinterpret_cast<void*>(DSP_BASE + (i * 2) + 1), &info->lo[i]);
+  }
+  sys_ptrace(PTRACE_PEEKUSER, tid,
+             reinterpret_cast<void*>(DSP_CONTROL), &info->dsp_control);
+#endif
+
   const uint8_t* stack_pointer;
 #if defined(__i386)
   my_memcpy(&stack_pointer, &info->regs.esp, sizeof(info->regs.esp));
@@ -215,6 +257,11 @@ bool LinuxPtraceDumper::GetThreadInfoByIndex(size_t index, ThreadInfo* info) {
   my_memcpy(&stack_pointer, &info->regs.rsp, sizeof(info->regs.rsp));
 #elif defined(__ARM_EABI__)
   my_memcpy(&stack_pointer, &info->regs.ARM_sp, sizeof(info->regs.ARM_sp));
+#elif defined(__aarch64__)
+  my_memcpy(&stack_pointer, &info->regs.sp, sizeof(info->regs.sp));
+#elif defined(__mips__)
+  stack_pointer =
+      reinterpret_cast<uint8_t*>(info->regs.regs[MD_CONTEXT_MIPS_REG_SP]);
 #else
 #error "This code hasn't been ported to your platform yet."
 #endif
