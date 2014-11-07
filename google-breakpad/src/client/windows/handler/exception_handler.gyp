@@ -40,7 +40,7 @@
       ],
       'dependencies': [
         '../breakpad_client.gyp:common',
-        '../crash_generation/crash_generation.gyp:crash_generation_server',
+        '../crash_generation/crash_generation.gyp:crash_generation_client',
       ]
     },
   ],
