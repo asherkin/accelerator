@@ -69,7 +69,7 @@ def BuildExtension():
 			binary.AddObjectFiles(['libbreakpad_client.a'])
 
 	elif AMBuild.target['platform'] in ['windows']:
-		libs = ['exception_handler', 'common', 'crash_generation_client']
+		libs = ['exception_handler', 'common', 'crash_generation_server']
 		for lib in libs:
 			path = os.path.join(AMBuild.sourceFolder, 'google-breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
 			if os.path.isfile(path):
