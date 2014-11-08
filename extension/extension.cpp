@@ -31,6 +31,8 @@
 #elif defined _WINDOWS
 #define _STDINT // ~.~
 #include "client/windows/handler/exception_handler.h"
+#else
+#error Bad platform.
 #endif
 
 Accelerator g_accelerator;
@@ -134,6 +136,8 @@ static bool dumpCallback(const wchar_t* dump_path,
 	printf("Wrote minidump to: %ls\\%ls.dmp\n", dump_path, minidump_id);
 	return succeeded;
 }
+#else
+#error Bad platform.
 #endif
 
 void UploadCrashDump(const char *path)
@@ -141,6 +145,7 @@ void UploadCrashDump(const char *path)
 	IWebForm *form = webternet->CreateForm();
 
 	form->AddString("UserID", g_pSM->GetCoreConfigValue("MinidumpAccount"));
+	form->AddString("GameDir", g_pSM->GetGameFolderName());
 
 	form->AddFile("upload_file_minidump", path);
 
@@ -164,6 +169,7 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 	IDirectory *dumps = libsys->OpenDirectory(buffer);
 
 	char path[512];
+	int count = 0;
 
 	while (dumps->MoreFiles())
 	{
@@ -176,16 +182,27 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, dumps->GetEntryName());
 		UploadCrashDump(path);
 		
+		int err = 0;
 #if defined _LINUX
-		unlink(path);
+		err = unlink(path);
 #elif defined _WINDOWS
-		_unlink(path);
+		err = _unlink(path);
+#else
+#error Bad platform.
 #endif
+		if (err != 0) {
+			printf(">>> FAILED TO DELETE CRASH DUMP!!!\n");
+		}
 
+		count++;
 		dumps->NextEntry();
 	}
 
 	libsys->CloseDirectory(dumps);
+	
+	if (count > 0) {
+		printf(">>> UPLOADED %d CRASH DUMPS\n", count);
+	}
 }
 
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
@@ -223,9 +240,9 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
 	
 	delete buf;
+#else
+#error Bad platform.
 #endif
-
-	
 
 	return true;
 }
@@ -236,6 +253,8 @@ void Accelerator::SDK_OnUnload()
 	g_pSM->RemoveGameFrameHook(OnGameFrame);
 #elif defined _WINDOWS
 	RemoveVectoredExceptionHandler(BreakpadVectoredHandler);
+#else
+#error Bad platform.
 #endif
 
 	delete handler;
