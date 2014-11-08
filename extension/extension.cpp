@@ -93,6 +93,8 @@ void OnGameFrame(bool simulating)
 	}
 }
 #elif defined _WINDOWS
+void *vectoredHandler = NULL;
+
 LONG CALLBACK BreakpadVectoredHandler(_In_ PEXCEPTION_POINTERS ExceptionInfo)
 {
 	switch (ExceptionInfo->ExceptionRecord->ExceptionCode)
@@ -238,7 +240,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	handler = new google_breakpad::ExceptionHandler(std::wstring(buf, num_chars), NULL, dumpCallback, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL);
 
-	AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
+	vectoredHandler = AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
 	
 	delete buf;
 #else
@@ -253,7 +255,9 @@ void Accelerator::SDK_OnUnload()
 #if defined _LINUX
 	g_pSM->RemoveGameFrameHook(OnGameFrame);
 #elif defined _WINDOWS
-	RemoveVectoredExceptionHandler(BreakpadVectoredHandler);
+	if (vectoredHandler) {
+		RemoveVectoredExceptionHandler(vectoredHandler);
+	}
 #else
 #error Bad platform.
 #endif
