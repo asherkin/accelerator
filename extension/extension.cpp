@@ -147,7 +147,7 @@ void UploadCrashDump(const char *path)
 	IWebForm *form = webternet->CreateForm();
 
 	form->AddString("UserID", g_pSM->GetCoreConfigValue("MinidumpAccount"));
-	form->AddString("GameDir", g_pSM->GetGameFolderName());
+	form->AddString("GameDirectory", g_pSM->GetGameFolderName());
 	form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
 
 	form->AddFile("upload_file_minidump", path);
