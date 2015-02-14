@@ -106,8 +106,8 @@ LONG CALLBACK BreakpadVectoredHandler(_In_ PEXCEPTION_POINTERS ExceptionInfo)
 		case EXCEPTION_ILLEGAL_INSTRUCTION:
 		case EXCEPTION_INT_DIVIDE_BY_ZERO:
 		case EXCEPTION_STACK_OVERFLOW:
-		case STATUS_STACK_BUFFER_OVERRUN:
-		case STATUS_HEAP_CORRUPTION:
+		case 0xC0000409: // STATUS_STACK_BUFFER_OVERRUN
+		case 0xC0000374: // STATUS_HEAP_CORRUPTION
 			break;
 		case 0: // Valve use this for Sys_Error.
 			if ((ExceptionInfo->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE) == 0)
