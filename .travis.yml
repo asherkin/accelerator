@@ -8,18 +8,12 @@ compiler:
   - clang
 before_script:
   - cd ..
-  - git clone --depth=1 --branch=master https://chromium.googlesource.com/chromium/tools/depot_tools.git
   - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.5
   - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
   - cd ambuild && python setup.py install --user
   - cd $TRAVIS_BUILD_DIR
-  - ../depot_tools/fetch breakpad
-  - mkdir ../dump_syms_build && cd ../dump_syms_build
-  - CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 $TRAVIS_BUILD_DIR/src/configure
-  - make src/tools/linux/dump_syms/dump_syms
-  - export PATH=$PATH:$PWD/src/tools/linux/dump_syms/
-  - cd $TRAVIS_BUILD_DIR
   - git fetch --unshallow || true
+  - ./breakpad.sh && export PATH=$PATH:$PWD/breakpad/src/tools/linux/dump_syms/
 script:
   - mkdir build && cd build
   - python ../configure.py --enable-optimize

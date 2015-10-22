@@ -16,21 +16,21 @@ def BuildBreakpad():
 	breakpad = AMBuild.AddJob('breakpad')
 
 	if AMBuild.target['platform'] in ['linux']:
-		if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'src', 'src', 'client', 'linux', 'libbreakpad_client.a')):
+		if osutil.FileExists(os.path.join(AMBuild.outputFolder, 'breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')):
 			return
 
-		breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'src', 'configure')))
+		breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'configure')))
 		breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
 		
 	elif AMBuild.target['platform'] in ['windows']:
-		if osutil.FileExists(os.path.join(AMBuild.sourceFolder, 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib')):
+		if osutil.FileExists(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib')):
 			return
 		
-		gyp = os.path.join(AMBuild.sourceFolder, 'src', 'src', 'tools', 'gyp', 'gyp.bat')
-		gyppath = os.path.join(AMBuild.sourceFolder, 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.gyp')
+		gyp = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'tools', 'gyp', 'gyp.bat')
+		gyppath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.gyp')
 		breakpad.AddCommand(DirectCommand([gyp, gyppath]))
 		
-		slnpath = os.path.join(AMBuild.sourceFolder, 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.sln')
+		slnpath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.sln')
 		breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
 
 def BuildExtension():
