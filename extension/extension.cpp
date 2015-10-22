@@ -24,6 +24,7 @@
 
 #if defined _LINUX
 #include "client/linux/handler/exception_handler.h"
+#include "third_party/lss/linux_syscall_support.h"
 
 #include <signal.h>
 #include <dirent.h> 
@@ -41,8 +42,22 @@ SMEXT_LINK(&g_accelerator);
 IWebternet *webternet;
 static IThreadHandle *uploadThread;
 
-char buffer[255];
+char buffer[512];
 google_breakpad::ExceptionHandler *handler = NULL;
+
+struct PluginInfo {
+        unsigned int serial;
+        PluginStatus status;
+        char filename[256];
+	char name[256];
+	char author[256];
+	char description[256];
+	char version[256];
+	char url[256];
+};
+
+unsigned int plugin_count;
+PluginInfo plugins[256];
 
 #if defined _LINUX
 void (*SignalHandler)(int, siginfo_t *, void *);
@@ -55,7 +70,40 @@ const int kNumHandledSignals = sizeof(kExceptionSignals) / sizeof(kExceptionSign
 
 static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, void* context, bool succeeded)
 {
-	printf("Wrote minidump to: %s\n", descriptor.path());
+	//printf("Wrote minidump to: %s\n", descriptor.path());
+
+	sys_write(STDOUT_FILENO, "Wrote minidump to: ", 19);
+	sys_write(STDOUT_FILENO, descriptor.path(), strlen(descriptor.path()));
+	sys_write(STDOUT_FILENO, "\n", 1);
+
+	strcpy(buffer, descriptor.path());
+	strcat(buffer, ".txt");
+
+	int extra = sys_open(buffer, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	if (extra == -1) {
+		sys_write(STDOUT_FILENO, "Failed to open metadata file!\n", 30);
+		return succeeded;
+	}
+
+	for (unsigned i = 0; i < plugin_count; ++i) {
+		PluginInfo *p = &plugins[i];
+		if (p->serial == 0) continue;
+		sys_write(extra, p->filename, strlen(p->filename));
+		sys_write(extra, "\n", 1);
+		sys_write(extra, p->name, strlen(p->name));
+		sys_write(extra, "\n", 1);
+		sys_write(extra, p->author, strlen(p->author));
+		sys_write(extra, "\n", 1);
+		sys_write(extra, p->description, strlen(p->description));
+		sys_write(extra, "\n", 1);
+		sys_write(extra, p->version, strlen(p->version));
+		sys_write(extra, "\n", 1);
+		sys_write(extra, p->url, strlen(p->url));
+		sys_write(extra, "\n", 1);
+	}
+
+	sys_close(extra);
+
 	return succeeded;
 }
 
@@ -155,6 +203,14 @@ void UploadCrashDump(const char *path)
 
 	form->AddFile("upload_file_minidump", path);
 
+	char metapath[512];
+	strcpy(metapath, path);
+	strcat(metapath, ".txt");
+	if (libsys->PathExists(metapath)) {
+		form->AddFile("upload_file_metadata", metapath);
+		unlink(metapath);
+	}
+
 	MemoryDownloader data;
 	IWebTransfer *xfer = webternet->CreateSession();
 	xfer->SetFailOnHTTPError(true);
@@ -184,8 +240,16 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 			dumps->NextEntry();
 			continue;
 		}
-		
-		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, dumps->GetEntryName());
+
+		const char *name = dumps->GetEntryName();
+		int namelen = strlen(name);
+
+		if (namelen < 4 || strcmp(&name[namelen-4], ".dmp") != 0) {
+			dumps->NextEntry();
+			continue;
+		}
+
+		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, name);
 		UploadCrashDump(path);
 		
 		int err = 0;
@@ -249,6 +313,27 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #else
 #error Bad platform.
 #endif
+
+	IPluginIterator *i = plsys->GetPluginIterator();
+	while (i->MorePlugins()) {
+		IPlugin *p = i->GetPlugin();
+		const sm_plugininfo_t *pmi = p->GetPublicInfo();
+		PluginInfo *pi = &plugins[plugin_count++];
+
+		pi->serial = p->GetSerial();
+		pi->status = p->GetStatus();
+
+		strncpy(pi->filename, p->GetFilename(), sizeof(pi->filename) - 1);
+
+		strncpy(pi->name, pmi->name, sizeof(pi->name) - 1);
+		strncpy(pi->author, pmi->author, sizeof(pi->author) - 1);
+		strncpy(pi->description, pmi->description, sizeof(pi->description) - 1);
+		strncpy(pi->version, pmi->version, sizeof(pi->version) - 1);
+		strncpy(pi->url, pmi->url, sizeof(pi->url) - 1);
+
+		i->NextPlugin();
+	}
+	delete i;
 
 	return true;
 }
