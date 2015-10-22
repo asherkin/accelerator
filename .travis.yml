@@ -14,7 +14,7 @@ before_script:
   - cd ambuild
   - python setup.py install --user
   - cd $TRAVIS_BUILD_DIR
-  - git fetch --unshallow
+  - git fetch --unshallow || true
   - ../depot_tools/fetch breakpad
 script:
   - mkdir build
