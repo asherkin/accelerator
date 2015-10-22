@@ -17,9 +17,12 @@ else
   ./depot_tools/gclient sync
 fi
 
-cd src
+if [ ! -d "build" ]; then
+  mkdir build
+fi
 
-CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ./configure
+cd build
+
+CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ../src/configure
 
 make src/tools/linux/dump_syms/dump_syms
-#make src/client/linux/libbreakpad_client.a
