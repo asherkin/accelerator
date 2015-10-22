@@ -1,8 +1,12 @@
 # vim: set ts=2 sw=2 tw=99 noet ft=python: 
 import os
-import urllib.request
 from ambuild.command import Command
 from ambuild.command import ShellCommand
+
+try:
+	import urllib.request as urllib
+except ImportError:
+	import urllib2 as urllib
 
 class IterateDebugInfoCommand(Command):
 	def run(self, master, job):

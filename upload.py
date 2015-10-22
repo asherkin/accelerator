@@ -12,26 +12,19 @@ elif sys.platform.startswith('win32'):
 elif sys.platform.startswith('darwin'):
 	platform = 'mac'
 
-def HGVersion():
-	p = subprocess.Popen(['hg', 'identify',  '-n'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+def GITHash():
+	p = subprocess.Popen(['git', 'rev-parse', '--short', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 	(stdout, stderr) = p.communicate()
 	stdout = stdout.decode('UTF-8')
+	return stdout.rstrip('\r\n')
 
-	return stdout.rstrip('+\r\n')
+def GITVersion():
+	p = subprocess.Popen(['git', 'rev-list', '--count', '--first-parent', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+	(stdout, stderr) = p.communicate()
+	stdout = stdout.decode('UTF-8')
+	return stdout.rstrip('\r\n')
 
-def ReleaseVersion():
-	productFile = open('product.version', 'r')
-	productContents = productFile.read()
-	productFile.close()
-
-	m = re.match('(\d+)\.(\d+)\.(\d+)(.*)', productContents)
-	if m == None:
-		raise Exception('Could not detremine product version')
-	
-	major, minor, release, tag = m.groups()
-	return '.'.join([major, minor, release])
-
-filename = '-'.join([os.environ.get('project', 'accelerator'), ReleaseVersion(), 'hg' + HGVersion(), platform])
+filename = '-'.join(['accelerator', 'git' + GITVersion(), GITHash(), platform])
 
 debug_build = os.environ.get('is_debug_build', False) == "1"
 

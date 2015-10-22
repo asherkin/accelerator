@@ -7,12 +7,13 @@ import ambuild.command as command
 
 #Quickly try to ascertain the current repository revision
 def GetVersion():
-	args = ['hg', 'parent', '-R', AMBuild.sourceFolder]
-	p = command.RunDirectCommand(AMBuild, args)
-	m = re.match('changeset:\s+(\d+):(.+)', p.stdoutText)
-	if m == None:
+	rev = command.RunDirectCommand(AMBuild, ['git', 'rev-list', '--count', 'HEAD']).stdoutText.strip()
+	cset = command.RunDirectCommand(AMBuild, ['git', 'log', '--pretty=format:%h', '-n', '1']).stdoutText.strip()
+
+	if not rev or not cset:
 		raise Exception('Could not determine repository version')
-	return m.groups()
+
+	return (rev, cset)
 
 def PerformReversioning():
 	rev, cset = GetVersion()

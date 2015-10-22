@@ -1,0 +1,25 @@
+sudo: false
+language: cpp
+addons:
+  apt:
+    packages:
+      - g++-multilib
+compiler:
+  - clang
+before_script:
+  - cd ..
+  - git clone --depth=1 --branch=master https://chromium.googlesource.com/chromium/tools/depot_tools.git
+  - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.5
+  - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
+  - cd ambuild
+  - python setup.py install --user
+  - cd $TRAVIS_BUILD_DIR
+  - git fetch --unshallow
+  - ../depot_tools/fetch breakpad
+script:
+  - mkdir build
+  - cd build
+  - python ../configure.py --enable-optimize
+  - python ./build.py
+after_success:
+  - python ../upload.py
