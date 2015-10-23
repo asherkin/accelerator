@@ -228,7 +228,6 @@ void UploadCrashDump(const char *path)
 	strcat(metapath, ".txt");
 	if (libsys->PathExists(metapath)) {
 		form->AddFile("upload_file_metadata", metapath);
-		unlink(metapath);
 	}
 
 	MemoryDownloader data;
@@ -243,6 +242,10 @@ void UploadCrashDump(const char *path)
 	} else {
 		printf(">>> UPLOADED CRASH DUMP");
 		printf("%s", data.GetBuffer());
+	}
+
+	if (libsys->PathExists(metapath)) {
+		unlink(metapath);
 	}
 }
 
