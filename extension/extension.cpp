@@ -24,6 +24,7 @@
 
 #if defined _LINUX
 #include "client/linux/handler/exception_handler.h"
+#include "common/linux/linux_libc_support.h"
 #include "third_party/lss/linux_syscall_support.h"
 
 #include <signal.h>
@@ -46,9 +47,9 @@ char buffer[512];
 google_breakpad::ExceptionHandler *handler = NULL;
 
 struct PluginInfo {
-        unsigned int serial;
-        PluginStatus status;
-        char filename[256];
+	unsigned int serial;
+	PluginStatus status;
+	char filename[256];
 	char name[256];
 	char author[256];
 	char description[256];
@@ -73,11 +74,11 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 	//printf("Wrote minidump to: %s\n", descriptor.path());
 
 	sys_write(STDOUT_FILENO, "Wrote minidump to: ", 19);
-	sys_write(STDOUT_FILENO, descriptor.path(), strlen(descriptor.path()));
+	sys_write(STDOUT_FILENO, descriptor.path(), my_strlen(descriptor.path()));
 	sys_write(STDOUT_FILENO, "\n", 1);
 
-	strcpy(buffer, descriptor.path());
-	strcat(buffer, ".txt");
+	my_strlcpy(buffer, descriptor.path(), sizeof(buffer));
+	my_strlcat(buffer, ".txt", sizeof(buffer));
 
 	int extra = sys_open(buffer, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	if (extra == -1) {
@@ -85,20 +86,39 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 		return succeeded;
 	}
 
+	char pis[64];
+	char pds[32];
 	for (unsigned i = 0; i < plugin_count; ++i) {
 		PluginInfo *p = &plugins[i];
 		if (p->serial == 0) continue;
-		sys_write(extra, p->filename, strlen(p->filename));
+		my_uitos(pds, i, my_uint_len(i));
+		pds[my_uint_len(i)] = '\0';
+		my_strlcpy(pis, "plugin[", sizeof(pis));
+		my_strlcat(pis, pds, sizeof(pis));
+		my_strlcat(pis, "].", sizeof(pis));
+		sys_write(extra, pis, my_strlen(pis));
+		sys_write(extra, "filename=", 9);
+		sys_write(extra, p->filename, my_strlen(p->filename));
 		sys_write(extra, "\n", 1);
-		sys_write(extra, p->name, strlen(p->name));
+		sys_write(extra, pis, my_strlen(pis));
+		sys_write(extra, "name=", 5);
+		sys_write(extra, p->name, my_strlen(p->name));
 		sys_write(extra, "\n", 1);
-		sys_write(extra, p->author, strlen(p->author));
+		sys_write(extra, pis, my_strlen(pis));
+		sys_write(extra, "author=", 7);
+		sys_write(extra, p->author, my_strlen(p->author));
 		sys_write(extra, "\n", 1);
-		sys_write(extra, p->description, strlen(p->description));
+		sys_write(extra, pis, my_strlen(pis));
+		sys_write(extra, "description=", 12);
+		sys_write(extra, p->description, my_strlen(p->description));
 		sys_write(extra, "\n", 1);
-		sys_write(extra, p->version, strlen(p->version));
+		sys_write(extra, pis, my_strlen(pis));
+		sys_write(extra, "version=", 8);
+		sys_write(extra, p->version, my_strlen(p->version));
 		sys_write(extra, "\n", 1);
-		sys_write(extra, p->url, strlen(p->url));
+		sys_write(extra, pis, my_strlen(pis));
+		sys_write(extra, "url=", 4);
+		sys_write(extra, p->url, my_strlen(p->url));
 		sys_write(extra, "\n", 1);
 	}
 
