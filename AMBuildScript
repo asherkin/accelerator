@@ -85,6 +85,7 @@ class SM:
 				self.compiler.AddToListVar('CFLAGS', '-g3')
 				self.compiler.AddToListVar('CFLAGS', '-m32')
 				self.compiler.AddToListVar('POSTLINKFLAGS', '-m32')
+				self.compiler.AddToListVar('POSTLINKFLAGS', '-Wl,-z,defs')
 				self.compiler.AddToListVar('CXXFLAGS', '-fno-exceptions')
 				self.compiler.AddToListVar('CXXFLAGS', '-fno-threadsafe-statics')
 				self.compiler.AddToListVar('CXXFLAGS', '-Wno-non-virtual-dtor')

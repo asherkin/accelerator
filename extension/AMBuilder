@@ -66,7 +66,7 @@ def BuildExtension():
 			os.lstat(link)
 		except:
 			extension.AddCommand(SymlinkCommand(link, target))
-			binary.AddObjectFiles(['libbreakpad_client.a'])
+		binary.AddObjectFiles(['libbreakpad_client.a'])
 
 	elif AMBuild.target['platform'] in ['windows']:
 		libs = ['exception_handler', 'common', 'crash_generation_client']
