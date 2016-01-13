@@ -344,7 +344,7 @@ void RunThread(IThreadHandle *pHandle)
 }
 
 void OnTerminate(IThreadHandle *pHandle, bool cancel) {
-	printf("Upload thread terminated (%s)\n", (cancel ? "true" : "false"));
+	printf("Upload thread terminated. (%s)\n", (cancel ? "true" : "false"));
 }
 } uploadThread;
 
