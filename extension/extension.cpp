@@ -227,7 +227,28 @@ static bool dumpCallback(const wchar_t* dump_path,
                          MDRawAssertionInfo* assertion,
                          bool succeeded)
 {
+	if (!succeeded) {
+		printf("Failed to write minidump to: %ls\\%ls.dmp\n", dump_path, minidump_id);
+		return succeeded;
+	}
+
 	printf("Wrote minidump to: %ls\\%ls.dmp\n", dump_path, minidump_id);
+
+	sprintf(buffer, "%ls\\%ls.txt", dump_path, minidump_id);
+
+	FILE *extra = fopen(buffer, L"wb");
+	if (!extra) {
+		printf("Failed to open metadata file!\n");
+		return succeeded;
+	}
+
+	if (GetSpew) {
+		GetSpew(spewBuffer, sizeof(spewBuffer));
+		fprintf(extra, "-------- CONSOLE HISTORY BEGIN --------\n%s-------- CONSOLE HISTORY END --------\n", spewBuffer);
+	}
+
+        fclose(extra);
+
 	return succeeded;
 }
 #else
