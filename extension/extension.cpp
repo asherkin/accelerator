@@ -280,7 +280,7 @@ void UploadCrashDump(const char *path)
 	
 	if (!xfer->PostAndDownload("http://crash.limetech.org/submit", form, &data, NULL))
 	{
-		printf(">>> UPLOAD FAILED\n");
+		printf(">>> UPLOAD FAILED: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
 	} else {
 		printf(">>> UPLOADED CRASH DUMP");
 		printf("%s", data.GetBuffer());
@@ -291,8 +291,11 @@ void UploadCrashDump(const char *path)
 	}
 }
 
-void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
+class UploadThread: public IThread {
+void RunThread(IThreadHandle *pHandle)
 {
+	printf("Upload thread started.\n");
+
 	IDirectory *dumps = libsys->OpenDirectory(buffer);
 
 	char path[512];
@@ -340,6 +343,11 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 	}
 }
 
+void OnTerminate(IThreadHandle *pHandle, bool cancel) {
+	printf("Upload thread terminated (%s)\n", (cancel ? "true" : "false"));
+}
+} uploadThread;
+
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	sharesys->AddDependency(myself, "webternet.ext", true, true);
@@ -356,6 +364,8 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 			return false;
 		}
 	}
+
+	threader->MakeThread(&uploadThread);
 
 	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, error, maxlength)) {
 		return false;

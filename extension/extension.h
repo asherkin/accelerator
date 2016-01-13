@@ -96,7 +96,6 @@ public:
 	 */
 	//virtual bool SDK_OnMetamodPauseChange(bool paused, char *error, size_t maxlen);
 #endif
-	virtual void OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax);
 };
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_
