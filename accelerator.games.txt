@@ -1,0 +1,54 @@
+"Games"
+{	
+	"#default"
+	{
+		"Signatures"
+		{
+			/*
+			 * String: "\nConsole History (reversed)\n\n"
+			 * It's the function in the following branch.
+			 */
+			"GetSpew"
+			{
+				"library" "engine"
+				"linux"   "@_Z7GetSpewPcj"
+			}
+		}
+	}
+
+	"tf"
+	{
+		"Signatures"
+		{
+			"GetSpew"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x20\x8D\x45\xE0\x57"
+			}
+		}
+	}
+
+	"cstrike"
+	{
+		"Signatures"
+		{
+			"GetSpew"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x53\xFF\x15\x2A\x2A\x2A\x2A\x8B\xD0"
+			}
+		}
+	}
+
+	"csgo"
+	{
+		"Signatures"
+		{
+			"GetSpew"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x08\x56\x57\x8B\xFA\x89\x4D\xFC"
+			}
+		}
+	}
+}

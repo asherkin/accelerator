@@ -67,12 +67,16 @@ class CopyFile(Command):
 		shutil.copy(self.fromFile, self.toPath)
 
 
-folders = [['addons', 'sourcemod', 'extensions']]
+folders = [
+	['addons', 'sourcemod', 'gamedata'],
+	['addons', 'sourcemod', 'extensions'],
+]
 
 #Setup
 job.AddCommand(DestroyPath(os.path.join(AMBuild.outputFolder, 'package')))
 job.AddCommand(CreateFolders(folders))
 
+job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.games.txt'), os.path.join('addons', 'sourcemod', 'gamedata')))
 job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.autoload'), os.path.join('addons', 'sourcemod', 'extensions')))
 
 bincopies = []

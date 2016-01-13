@@ -41,7 +41,12 @@ Accelerator g_accelerator;
 SMEXT_LINK(&g_accelerator);
 
 IWebternet *webternet;
-static IThreadHandle *uploadThread;
+IGameConfig *gameconfig;
+
+typedef void (*GetSpew_t)(char *buffer, unsigned int length);
+GetSpew_t GetSpew;
+
+char spewBuffer[65536]; // Hi.
 
 char buffer[512];
 google_breakpad::ExceptionHandler *handler = NULL;
@@ -73,9 +78,18 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 {
 	//printf("Wrote minidump to: %s\n", descriptor.path());
 
-	sys_write(STDOUT_FILENO, "Wrote minidump to: ", 19);
+	if (succeeded) {
+		sys_write(STDOUT_FILENO, "Wrote minidump to: ", 19);
+	} else {
+		sys_write(STDOUT_FILENO, "Failed to write minidump to: ", 29);
+	}
+
 	sys_write(STDOUT_FILENO, descriptor.path(), my_strlen(descriptor.path()));
 	sys_write(STDOUT_FILENO, "\n", 1);
+
+	if (!succeeded) {
+		return succeeded;
+	}
 
 	my_strlcpy(buffer, descriptor.path(), sizeof(buffer));
 	my_strlcat(buffer, ".txt", sizeof(buffer));
@@ -84,6 +98,13 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 	if (extra == -1) {
 		sys_write(STDOUT_FILENO, "Failed to open metadata file!\n", 30);
 		return succeeded;
+	}
+
+	if (GetSpew) {
+		GetSpew(spewBuffer, sizeof(spewBuffer));
+                sys_write(extra, "-------- CONSOLE HISTORY BEGIN --------\n", 40);
+		sys_write(extra, spewBuffer, my_strlen(spewBuffer));
+		sys_write(extra, "-------- CONSOLE HISTORY END --------\n", 38);
 	}
 
 	char pis[64];
@@ -313,6 +334,16 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 				g_pSM->Format(error, maxlength, "%s didn't exist and we couldn't create it :(", buffer);
 			return false;
 		}
+	}
+
+	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, error, maxlength)) {
+		return false;
+	}
+
+	if (!gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
+		smutils->LogError(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
+	} else if (!GetSpew) {
+		smutils->LogError(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
 	}
 
 #if defined _LINUX
