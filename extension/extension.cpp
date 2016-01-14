@@ -53,6 +53,7 @@ char logPath[512];
 
 google_breakpad::ExceptionHandler *handler = NULL;
 
+# if 0
 struct PluginInfo {
 	unsigned int serial;
 	PluginStatus status;
@@ -66,6 +67,7 @@ struct PluginInfo {
 
 unsigned int plugin_count;
 PluginInfo plugins[256];
+#endif
 
 #if defined _LINUX
 void (*SignalHandler)(int, siginfo_t *, void *);
@@ -109,6 +111,7 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 		sys_write(extra, "-------- CONSOLE HISTORY END --------\n", 38);
 	}
 
+#if 0
 	char pis[64];
 	char pds[32];
 	for (unsigned i = 0; i < plugin_count; ++i) {
@@ -144,6 +147,7 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 		sys_write(extra, p->url, my_strlen(p->url));
 		sys_write(extra, "\n", 1);
 	}
+#endif
 
 	sys_close(extra);
 
@@ -411,6 +415,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #error Bad platform.
 #endif
 
+#if 0
 	IPluginIterator *i = plsys->GetPluginIterator();
 	while (i->MorePlugins()) {
 		IPlugin *p = i->GetPlugin();
@@ -431,6 +436,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		i->NextPlugin();
 	}
 	delete i;
+#endif
 
 	return true;
 }
