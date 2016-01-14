@@ -24,7 +24,19 @@ def GITVersion():
 	stdout = stdout.decode('UTF-8')
 	return stdout.rstrip('\r\n')
 
-filename = '-'.join(['accelerator', 'git' + GITVersion(), GITHash(), platform])
+def ReleaseVersion():
+	productFile = open('../product.version', 'r')
+	productContents = productFile.read()
+	productFile.close()
+
+	m = re.match('(\d+)\.(\d+)\.(\d+)(.*)', productContents)
+	if m == None:
+		raise Exception('Could not detremine product version')
+
+	major, minor, release, tag = m.groups()
+	return '.'.join([major, minor, release])
+
+filename = '-'.join(['accelerator', ReleaseVersion(), 'git' + GITVersion(), GITHash(), platform])
 
 debug_build = os.environ.get('is_debug_build', False) == "1"
 
