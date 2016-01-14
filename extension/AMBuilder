@@ -71,7 +71,7 @@ def BuildExtension():
 	elif AMBuild.target['platform'] in ['windows']:
 		libs = ['exception_handler', 'common', 'crash_generation_client']
 		for lib in libs:
-			path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
+			path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
 			if os.path.isfile(path):
 				binary.RelinkIfNewer(path)
 			binary['POSTLINKFLAGS'].extend([path])
