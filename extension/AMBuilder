@@ -27,10 +27,17 @@ def BuildBreakpad():
 			return
 
 		gyp = os.path.join(AMBuild.sourceFolder, 'breakpad', 'gyp', 'gyp.bat')
+
 		gyppath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.gyp')
 		breakpad.AddCommand(DirectCommand([gyp, '--no-circular-check', gyppath]))
 
 		slnpath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.sln')
+		breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
+
+		gyppath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'crash_generation.gyp')
+		breakpad.AddCommand(DirectCommand([gyp, '--no-circular-check', gyppath]))
+
+		slnpath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'crash_generation.sln')
 		breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
 
 def BuildExtension():
