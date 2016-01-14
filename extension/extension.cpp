@@ -48,7 +48,9 @@ GetSpew_t GetSpew;
 
 char spewBuffer[65536]; // Hi.
 
-char buffer[512];
+char dumpStoragePath[512];
+char logPath[512];
+
 google_breakpad::ExceptionHandler *handler = NULL;
 
 struct PluginInfo {
@@ -91,10 +93,10 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 		return succeeded;
 	}
 
-	my_strlcpy(buffer, descriptor.path(), sizeof(buffer));
-	my_strlcat(buffer, ".txt", sizeof(buffer));
+	my_strlcpy(dumpStoragePath, descriptor.path(), sizeof(dumpStoragePath));
+	my_strlcat(dumpStoragePath, ".txt", sizeof(dumpStoragePath));
 
-	int extra = sys_open(buffer, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	int extra = sys_open(dumpStoragePath, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	if (extra == -1) {
 		sys_write(STDOUT_FILENO, "Failed to open metadata file!\n", 30);
 		return succeeded;
@@ -234,9 +236,9 @@ static bool dumpCallback(const wchar_t* dump_path,
 
 	printf("Wrote minidump to: %ls\\%ls.dmp\n", dump_path, minidump_id);
 
-	sprintf(buffer, "%ls\\%ls.txt", dump_path, minidump_id);
+	sprintf(dumpStoragePath, "%ls\\%ls.txt", dump_path, minidump_id);
 
-	FILE *extra = fopen(buffer, L"wb");
+	FILE *extra = fopen(dumpStoragePath, L"wb");
 	if (!extra) {
 		printf("Failed to open metadata file!\n");
 		return succeeded;
@@ -255,7 +257,7 @@ static bool dumpCallback(const wchar_t* dump_path,
 #error Bad platform.
 #endif
 
-void UploadCrashDump(const char *path)
+bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen)
 {
 	IWebForm *form = webternet->CreateForm();
 
@@ -266,8 +268,7 @@ void UploadCrashDump(const char *path)
 	form->AddFile("upload_file_minidump", path);
 
 	char metapath[512];
-	strcpy(metapath, path);
-	strcat(metapath, ".txt");
+	g_pSM->Format(metapath, sizeof(metapath), "%s.txt", path);
 	if (libsys->PathExists(metapath)) {
 		form->AddFile("upload_file_metadata", metapath);
 	}
@@ -276,76 +277,85 @@ void UploadCrashDump(const char *path)
 	IWebTransfer *xfer = webternet->CreateSession();
 	xfer->SetFailOnHTTPError(true);
 
-	printf(">>> UPLOADING %s\n", path);
-	
-	if (!xfer->PostAndDownload("http://crash.limetech.org/submit", form, &data, NULL))
-	{
-		printf(">>> UPLOAD FAILED: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
-	} else {
-		printf(">>> UPLOADED CRASH DUMP");
-		printf("%s", data.GetBuffer());
+	bool uploaded = xfer->PostAndDownload("http://crash.limetech.org/submit", form, &data, NULL);	
+
+	if (response) {
+		if (uploaded) {
+			g_pSM->Format(response, maxlen, "%s", data.GetBuffer());
+		} else {
+			g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
+		}
 	}
 
 	if (libsys->PathExists(metapath)) {
 		unlink(metapath);
 	}
+
+	unlink(path);
+
+	return uploaded;
 }
 
-class UploadThread: public IThread {
-void RunThread(IThreadHandle *pHandle)
+class UploadThread: public IThread
 {
-	printf("Upload thread started.\n");
+	void RunThread(IThreadHandle *pHandle) {
+		rootconsole->ConsolePrint("Accelerator upload thread started.");
 
-	IDirectory *dumps = libsys->OpenDirectory(buffer);
+		FILE *log = fopen(logPath, "a");
+		if (!log) {
+			g_pSM->LogError(myself, "Failed to open Accelerator log file: %s", logPath);
+		}
 
-	char path[512];
-	int count = 0;
+		IDirectory *dumps = libsys->OpenDirectory(dumpStoragePath);
 
-	while (dumps->MoreFiles())
-	{
-		if (!dumps->IsEntryFile())
-		{
+		int count = 0;
+		int failed = 0;
+		char path[512];
+		char response[512];
+
+		while (dumps->MoreFiles()) {
+			if (!dumps->IsEntryFile()) {
+				dumps->NextEntry();
+				continue;
+			}
+
+			const char *name = dumps->GetEntryName();
+
+			int namelen = strlen(name);
+			if (namelen < 4 || strcmp(&name[namelen-4], ".dmp") != 0) {
+				dumps->NextEntry();
+				continue;
+			}
+
+			g_pSM->Format(path, sizeof(path), "%s/%s", dumpStoragePath, name);
+			bool uploaded = UploadAndDeleteCrashDump(path, response, sizeof(response));
+
+			if (uploaded) {
+				count++;
+				g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
+				if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
+			} else {
+				failed++;
+				g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
+                                if (log) fprintf(log, "Failed to upload crash dump: %s\n", response);
+			}
+
 			dumps->NextEntry();
-			continue;
 		}
 
-		const char *name = dumps->GetEntryName();
-		int namelen = strlen(name);
+		libsys->CloseDirectory(dumps);
 
-		if (namelen < 4 || strcmp(&name[namelen-4], ".dmp") != 0) {
-			dumps->NextEntry();
-			continue;
+		if (log) {
+			fclose(log);
 		}
 
-		g_pSM->Format(path, sizeof(path), "%s/%s", buffer, name);
-		UploadCrashDump(path);
-		
-		int err = 0;
-#if defined _LINUX
-		err = unlink(path);
-#elif defined _WINDOWS
-		err = _unlink(path);
-#else
-#error Bad platform.
-#endif
-		if (err != 0) {
-			printf(">>> FAILED TO DELETE CRASH DUMP!!!\n");
-		}
-
-		count++;
-		dumps->NextEntry();
+		rootconsole->ConsolePrint("Accelerator upload thread finished. (%d uploaded, %d failed)", count, failed);
 	}
 
-	libsys->CloseDirectory(dumps);
-	
-	if (count > 0) {
-		printf(">>> UPLOADED %d CRASH DUMPS\n", count);
+	void OnTerminate(IThreadHandle *pHandle, bool cancel) {
+		rootconsole->ConsolePrint("Accelerator upload thread terminated. (canceled = %s)", (cancel ? "true" : "false"));
 	}
-}
 
-void OnTerminate(IThreadHandle *pHandle, bool cancel) {
-	printf("Upload thread terminated. (%s)\n", (cancel ? "true" : "false"));
-}
 } uploadThread;
 
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
@@ -353,17 +363,19 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	sharesys->AddDependency(myself, "webternet.ext", true, true);
 	SM_GET_IFACE(WEBTERNET, webternet);
 
-	g_pSM->BuildPath(Path_SM, buffer, sizeof(buffer), "data/dumps");
+	g_pSM->BuildPath(Path_SM, dumpStoragePath, sizeof(dumpStoragePath), "data/dumps");
 
-	if (!libsys->IsPathDirectory(buffer))
+	if (!libsys->IsPathDirectory(dumpStoragePath))
 	{
-		if (!libsys->CreateFolder(buffer))
+		if (!libsys->CreateFolder(dumpStoragePath))
 		{
 			if (error)
-				g_pSM->Format(error, maxlength, "%s didn't exist and we couldn't create it :(", buffer);
+				g_pSM->Format(error, maxlength, "%s didn't exist and we couldn't create it :(", dumpStoragePath);
 			return false;
 		}
 	}
+
+	g_pSM->BuildPath(Path_SM, logPath, sizeof(logPath), "logs/accelerator.log");
 
 	threader->MakeThread(&uploadThread);
 
@@ -378,7 +390,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	}
 
 #if defined _LINUX
-	google_breakpad::MinidumpDescriptor descriptor(buffer);
+	google_breakpad::MinidumpDescriptor descriptor(dumpStoragePath);
 	handler = new google_breakpad::ExceptionHandler(descriptor, NULL, dumpCallback, NULL, true, -1);
 
 	struct sigaction oact;
@@ -387,8 +399,8 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	
 	g_pSM->AddGameFrameHook(OnGameFrame);
 #elif defined _WINDOWS
-	wchar_t *buf = new wchar_t[sizeof(buffer)];
-	size_t num_chars = mbstowcs(buf, buffer, sizeof(buffer));
+	wchar_t *buf = new wchar_t[sizeof(dumpStoragePath)];
+	size_t num_chars = mbstowcs(buf, dumpStoragePath, sizeof(dumpStoragePath));
 
 	handler = new google_breakpad::ExceptionHandler(std::wstring(buf, num_chars), NULL, dumpCallback, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL);
 

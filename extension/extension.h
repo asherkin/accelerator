@@ -26,7 +26,7 @@
  * @brief Accelerator extension code header.
  */
 
-#include "smsdk_ext.hpp"
+#include "smsdk_ext.h"
 
 /**
  * @brief Sample implementation of the SDK Extension.
