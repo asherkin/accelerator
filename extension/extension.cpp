@@ -236,7 +236,7 @@ static bool dumpCallback(const wchar_t* dump_path,
 
 	printf("Wrote minidump to: %ls\\%ls.dmp\n", dump_path, minidump_id);
 
-	sprintf(dumpStoragePath, "%ls\\%ls.txt", dump_path, minidump_id);
+	sprintf(dumpStoragePath, "%ls\\%ls.dmp.txt", dump_path, minidump_id);
 
 	FILE *extra = fopen(dumpStoragePath, "wb");
 	if (!extra) {
