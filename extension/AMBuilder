@@ -1,4 +1,4 @@
-# vim: set ts=2 sw=2 tw=99 noet ft=python: 
+# vim: set ts=2 sw=2 tw=99 noet ft=python:
 import os
 import ambuild.osutil as osutil
 from ambuild.command import SymlinkCommand
@@ -21,15 +21,15 @@ def BuildBreakpad():
 
 		breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'configure')))
 		breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
-		
+
 	elif AMBuild.target['platform'] in ['windows']:
 		if osutil.FileExists(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib')):
 			return
-		
-		gyp = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'tools', 'gyp', 'gyp.bat')
+
+		gyp = os.path.join(AMBuild.sourceFolder, 'breakpad', 'gyp', 'gyp.bat')
 		gyppath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.gyp')
-		breakpad.AddCommand(DirectCommand([gyp, gyppath]))
-		
+		breakpad.AddCommand(DirectCommand([gyp, '--no-circular-check', gyppath]))
+
 		slnpath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.sln')
 		breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
 
@@ -37,7 +37,7 @@ def BuildExtension():
 	compiler = SM.DefaultCompiler()
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension'))
-	
+
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public'))
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'extensions'))
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'sourcepawn'))
