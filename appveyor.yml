@@ -1,4 +1,6 @@
 version: '{build}'
+environment:
+  GYP_MSVS_VERSION: '2013'
 install:
   - cd ..
   - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.5
