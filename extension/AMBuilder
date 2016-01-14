@@ -76,12 +76,17 @@ def BuildExtension():
 		binary.AddObjectFiles(['libbreakpad_client.a'])
 
 	elif AMBuild.target['platform'] in ['windows']:
-		libs = ['exception_handler', 'common', 'crash_generation_client']
+		libs = ['exception_handler', 'common']
 		for lib in libs:
 			path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
 			if os.path.isfile(path):
 				binary.RelinkIfNewer(path)
 			binary['POSTLINKFLAGS'].extend([path])
+
+		path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib')
+		if os.path.isfile(path):
+			binary.RelinkIfNewer(path)
+		binary['POSTLINKFLAGS'].extend([path])
 
 	SM.AutoVersion('extension', binary)
 	SM.ExtractDebugInfo(extension, binary)
