@@ -265,7 +265,9 @@ bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen)
 {
 	IWebForm *form = webternet->CreateForm();
 
-	form->AddString("UserID", g_pSM->GetCoreConfigValue("MinidumpAccount"));
+	const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
+	if (minidumpAccount) form->AddString("UserID", minidumpAccount);
+
 	form->AddString("GameDirectory", g_pSM->GetGameFolderName());
 	form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
 
