@@ -2,6 +2,19 @@
 {	
 	"#default"
 	{
+		"Offsets"
+		{
+			/*
+			 * This has never changed, let us hope it never does.
+			 */
+			"GetCmdLine"
+			{
+				"windows" "2"
+				"linux" "2"
+				"mac" "2"
+			}
+		}
+
 		"Signatures"
 		{
 			/*

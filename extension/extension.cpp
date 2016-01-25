@@ -48,6 +48,13 @@ GetSpew_t GetSpew;
 
 char spewBuffer[65536]; // Hi.
 
+char crashMap[256];
+char crashGamePath[512];
+char crashCommandLine[1024];
+char crashSourceModPath[512];
+char crashGameDirectory[256];
+char crashExtensionVersion[32];
+
 char dumpStoragePath[512];
 char logPath[512];
 
@@ -103,6 +110,21 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 		sys_write(STDOUT_FILENO, "Failed to open metadata file!\n", 30);
 		return succeeded;
 	}
+
+	sys_write(extra, "-------- CONFIG BEGIN --------", 30);
+	sys_write(extra, "\nMap=", 5);
+	sys_write(extra, crashMap, my_strlen(crashMap));
+	sys_write(extra, "\nGamePath=", 10);
+	sys_write(extra, crashGamePath, my_strlen(crashGamePath));
+	sys_write(extra, "\nCommandLine=", 13);
+	sys_write(extra, crashCommandLine, my_strlen(crashCommandLine));
+	sys_write(extra, "\nSourceModPath=", 15);
+	sys_write(extra, crashSourceModPath, my_strlen(crashSourceModPath));
+	sys_write(extra, "\nGameDirectory=", 15);
+	sys_write(extra, crashGameDirectory, my_strlen(crashGameDirectory));
+	sys_write(extra, "\nExtensionVersion=", 18);
+	sys_write(extra, crashExtensionVersion, my_strlen(crashExtensionVersion));
+	sys_write(extra, "\n-------- CONFIG END --------\n", 30);
 
 	if (GetSpew) {
 		GetSpew(spewBuffer, sizeof(spewBuffer));
@@ -440,6 +462,10 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	delete i;
 #endif
 
+	if (late) {
+		this->OnCoreMapStart(NULL, 0, 0);
+	}
+
 	return true;
 }
 
@@ -456,5 +482,52 @@ void Accelerator::SDK_OnUnload()
 #endif
 
 	delete handler;
+}
+
+class VFuncEmptyClass {};
+
+const char *GetCmdLine()
+{
+	static int getCmdLineOffset = 0;
+	if (getCmdLineOffset == 0) {
+		if (!gameconfig->GetOffset("GetCmdLine", &getCmdLineOffset)) {
+			return "";
+		}
+		if (getCmdLineOffset == 0) {
+			return "";
+		}
+	}
+
+	void *cmdline = gamehelpers->GetValveCommandLine();
+	void **vtable = *(void ***)cmdline;
+	void *vfunc = vtable[getCmdLineOffset];
+
+	union {
+		const char *(VFuncEmptyClass::*mfpnew)();
+#ifndef WIN32
+		struct {
+			void *addr;
+			intptr_t adjustor;
+		} s;
+	} u;
+	u.s.addr = vfunc;
+	u.s.adjustor = 0;
+#else
+		void *addr;
+	} u;
+	u.addr = vfunc;
+#endif
+
+	return (const char *)(reinterpret_cast<VFuncEmptyClass*>(cmdline)->*u.mfpnew)();
+}
+
+void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
+{
+	strncpy(crashMap, gamehelpers->GetCurrentMap(), sizeof(crashMap) - 1);
+	strncpy(crashGamePath, g_pSM->GetGamePath(), sizeof(crashGamePath) - 1);
+	strncpy(crashCommandLine, GetCmdLine(), sizeof(crashCommandLine) - 1);
+	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
+	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
+	strncpy(crashExtensionVersion, SMEXT_CONF_VERSION, sizeof(crashExtensionVersion) - 1);
 }
 

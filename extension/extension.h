@@ -96,6 +96,14 @@ public:
 	 */
 	//virtual bool SDK_OnMetamodPauseChange(bool paused, char *error, size_t maxlen);
 #endif
+	/**
+	 * @brief Called on server activation before plugins receive the OnServerLoad forward.
+	 * 
+	 * @param pEdictList		Edicts list.
+	 * @param edictCount		Number of edicts in the list.
+	 * @param clientMax			Maximum number of clients allowed in the server.
+	 */
+	virtual void OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax);
 };
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_
