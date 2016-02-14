@@ -12,9 +12,9 @@ if [ ! -d "depot_tools" ]; then
 fi
 
 if [ ! -d "src" ]; then
-  ./depot_tools/fetch --nohooks --no-history breakpad
+  ./depot_tools/fetch --nohooks breakpad
 else
-  ./depot_tools/gclient sync --nohooks --no-history
+  ./depot_tools/gclient sync --nohooks
 fi
 
 if [ ! -d "build" ]; then

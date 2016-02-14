@@ -8,10 +8,10 @@ git clone --depth=1 --branch=master https://chromium.googlesource.com/chromium/t
 :HASDEPOTTOOLS
 
 IF EXIST src\NUL GOTO HASSRC
-cmd /c depot_tools\fetch --nohooks --no-history breakpad
+cmd /c depot_tools\fetch --nohooks breakpad
 GOTO DONESRC
 :HASSRC
-cmd /c depot_tools\gclient sync --nohooks --no-history
+cmd /c depot_tools\gclient sync --nohooks
 :DONESRC
 
 IF EXIST gyp\NUL GOTO HASGYP
