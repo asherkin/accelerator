@@ -309,7 +309,10 @@ bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen)
 
 	if (response) {
 		if (uploaded) {
-			g_pSM->Format(response, maxlen, "%s", data.GetBuffer());
+                        int responseSize = data.GetSize();
+                        if (responseSize >= maxlen) responseSize = maxlen - 1;
+                        strncpy(response, data.GetBuffer(), responseSize);
+                        response[responseSize] = '\0';
 		} else {
 			g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
 		}
