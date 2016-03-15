@@ -305,14 +305,17 @@ bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen)
 	IWebTransfer *xfer = webternet->CreateSession();
 	xfer->SetFailOnHTTPError(true);
 
-	bool uploaded = xfer->PostAndDownload("http://crash.limetech.org/submit", form, &data, NULL);	
+	const char *minidumpUrl = g_pSM->GetCoreConfigValue("MinidumpUrl");
+	if (!minidumpUrl) minidumpUrl = "http://crash.limetech.org/submit";
+
+	bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);	
 
 	if (response) {
 		if (uploaded) {
-                        int responseSize = data.GetSize();
-                        if (responseSize >= maxlen) responseSize = maxlen - 1;
-                        strncpy(response, data.GetBuffer(), responseSize);
-                        response[responseSize] = '\0';
+			int responseSize = data.GetSize();
+			if (responseSize >= maxlen) responseSize = maxlen - 1;
+			strncpy(response, data.GetBuffer(), responseSize);
+			response[responseSize] = '\0';
 		} else {
 			g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
 		}
