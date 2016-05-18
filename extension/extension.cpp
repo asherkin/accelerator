@@ -413,11 +413,10 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	threader->MakeThread(&uploadThread);
 
-	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, error, maxlength)) {
-		return false;
-	}
-
-	if (!gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
+	char gameconfigError[256];
+	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, gameconfigError, sizeof(gameconfigError))) {
+		smutils->LogError(myself, "WARNING: Failed to load gamedata file, console output and command line will not be included in crash reports: %s", gameconfigError);
+	} else if (!gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
 		smutils->LogError(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
 	} else if (!GetSpew) {
 		smutils->LogError(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
@@ -496,7 +495,7 @@ const char *GetCmdLine()
 {
 	static int getCmdLineOffset = 0;
 	if (getCmdLineOffset == 0) {
-		if (!gameconfig->GetOffset("GetCmdLine", &getCmdLineOffset)) {
+		if (!gameconfig || !gameconfig->GetOffset("GetCmdLine", &getCmdLineOffset)) {
 			return "";
 		}
 		if (getCmdLineOffset == 0) {
