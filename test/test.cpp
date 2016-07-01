@@ -89,7 +89,8 @@ int main(int argc, char *argv[])
 
 	// Test shit here.
 
-        int a = *(int *)0x0;
+	volatile int *a = nullptr;
+	*a = 0xDEADBEEF;
 
         delete handler;
 
