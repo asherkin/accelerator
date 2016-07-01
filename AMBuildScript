@@ -231,6 +231,7 @@ AMBuild.Include(os.path.join('buildbot', 'Versioning'), globals)
 
 FileList = [
 		['extension', 'AMBuilder'],
+		['test', 'AMBuilder'],
 		['buildbot', 'PackageScript'],
 		['buildbot', 'BreakpadSymbols']
 	]

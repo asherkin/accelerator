@@ -1,0 +1,54 @@
+# vim: set ts=2 sw=2 tw=99 noet ft=python:
+import os
+import ambuild.osutil as osutil
+from ambuild.command import SymlinkCommand
+from ambuild.command import ShellCommand
+from ambuild.command import DirectCommand
+
+def BuildEverything():
+	if AMBuild.target['platform'] not in ['linux']:
+		return
+
+	compiler = SM.DefaultCompiler()
+
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src'))
+
+	if AMBuild.target['platform'] in ['linux']:
+		compiler['POSTLINKFLAGS'].append('-lstdc++')
+		compiler['POSTLINKFLAGS'].append('-pthread')
+
+	name = 'test'
+	extension = AMBuild.AddJob(name)
+	binary = Cpp.ExecutableBuilder(name, AMBuild, extension, compiler)
+
+	binary.AddSourceFiles('test', [
+		'test.cpp',
+	])
+
+	if AMBuild.target['platform'] in ['linux']:
+		link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
+		target = os.path.join(AMBuild.outputFolder, 'breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')
+		try:
+			os.lstat(link)
+		except:
+			extension.AddCommand(SymlinkCommand(link, target))
+		binary.AddObjectFiles(['libbreakpad_client.a'])
+
+	elif AMBuild.target['platform'] in ['windows']:
+		libs = ['exception_handler', 'common']
+		for lib in libs:
+			path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
+			if os.path.isfile(path):
+				binary.RelinkIfNewer(path)
+			binary['POSTLINKFLAGS'].extend([path])
+
+		path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib')
+		if os.path.isfile(path):
+			binary.RelinkIfNewer(path)
+		binary['POSTLINKFLAGS'].extend([path])
+
+	SM.ExtractDebugInfo(extension, binary)
+
+	binary.SendToJob()
+
+BuildEverything()
