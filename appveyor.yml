@@ -7,6 +7,8 @@ install:
   - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.5
   - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
   - cd ambuild
+  - git fetch origin pull/38/head:fix-decode
+  - git checkout fix-decode
   - C:\python27\python.exe setup.py install
   - cd %APPVEYOR_BUILD_FOLDER%
   - breakpad.bat
