@@ -68,6 +68,7 @@ class CopyFile(Command):
 
 
 folders = [
+	['addons', 'sourcemod', 'configs'],
 	['addons', 'sourcemod', 'gamedata'],
 	['addons', 'sourcemod', 'extensions'],
 ]
@@ -93,6 +94,18 @@ def AddNormalLibrary(name, dest):
 	elif AMBuild.target['platform'] == 'windows':
 		debug_info.append(name + '\\' + name + '.pdb')
 
+def AddExecutable(name, dest):
+	dest = os.path.join('addons', 'sourcemod', dest)
+	bincopies.append(CopyFile(os.path.join('..', name, name + osutil.ExecutableSuffix()), dest))
+	
+	# Each platform's version of dump_syms needs the path in a different format.
+	if AMBuild.target['platform'] == 'linux':
+		debug_info.append(name + '/' + name)
+	elif AMBuild.target['platform'] == 'darwin':
+		debug_info.append(name + '/' + name + '.dSYM')
+	elif AMBuild.target['platform'] == 'windows':
+		debug_info.append(name + '\\' + name + '.pdb')
+
 def AddHL2Library(name, dest):
 	for i in SM.sdkInfo:
 		sdk = SM.sdkInfo[i]
@@ -103,6 +116,10 @@ def AddHL2Library(name, dest):
 debug_info = []
 
 AddNormalLibrary('accelerator.ext', 'extensions')
+
+
+if AMBuild.target['platform'] == 'linux':
+	AddExecutable('test-crash-dump-generation', 'configs')
 
 job.AddCommandGroup(bincopies)
 	

@@ -17,7 +17,7 @@ def BuildEverything():
 		compiler['POSTLINKFLAGS'].append('-lstdc++')
 		compiler['POSTLINKFLAGS'].append('-pthread')
 
-	name = 'test'
+	name = 'test-crash-dump-generation'
 	extension = AMBuild.AddJob(name)
 	binary = Cpp.ExecutableBuilder(name, AMBuild, extension, compiler)
 
