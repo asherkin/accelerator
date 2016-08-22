@@ -3,7 +3,7 @@
 #include "third_party/lss/linux_syscall_support.h"
 
 #include <signal.h>
-#include <dirent.h> 
+#include <dirent.h>
 #include <unistd.h>
 
 static bool dumpCallback(const google_breakpad::MinidumpDescriptor &descriptor, void *context, bool succeeded)
@@ -28,7 +28,6 @@ int main(int argc, char *argv[])
 	// Test shit here.
 	__builtin_trap();
 
-        delete handler;
+	delete handler;
 	return 0;
 }
-

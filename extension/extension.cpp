@@ -7,7 +7,7 @@
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 3.0, as published by the
  * Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
@@ -28,7 +28,7 @@
 #include "third_party/lss/linux_syscall_support.h"
 
 #include <signal.h>
-#include <dirent.h> 
+#include <dirent.h>
 #include <unistd.h>
 #elif defined _WINDOWS
 #define _STDINT // ~.~
@@ -54,6 +54,7 @@ char crashCommandLine[1024];
 char crashSourceModPath[512];
 char crashGameDirectory[256];
 char crashExtensionVersion[32];
+char steamInf[512];
 
 char dumpStoragePath[512];
 char logPath[512];
@@ -124,13 +125,16 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 	sys_write(extra, crashGameDirectory, my_strlen(crashGameDirectory));
 	sys_write(extra, "\nExtensionVersion=", 18);
 	sys_write(extra, crashExtensionVersion, my_strlen(crashExtensionVersion));
+	sys_write(extra, steamInf, my_strlen(steamInf));
 	sys_write(extra, "\n-------- CONFIG END --------\n", 30);
 
 	if (GetSpew) {
 		GetSpew(spewBuffer, sizeof(spewBuffer));
-                sys_write(extra, "-------- CONSOLE HISTORY BEGIN --------\n", 40);
-		sys_write(extra, spewBuffer, my_strlen(spewBuffer));
-		sys_write(extra, "-------- CONSOLE HISTORY END --------\n", 38);
+		if (my_strlen(spewBuffer) > 0) {
+			sys_write(extra, "-------- CONSOLE HISTORY BEGIN --------\n", 40);
+			sys_write(extra, spewBuffer, my_strlen(spewBuffer));
+			sys_write(extra, "-------- CONSOLE HISTORY END --------\n", 38);
+		}
 	}
 
 #if 0
@@ -201,7 +205,7 @@ void OnGameFrame(bool simulating)
 	for (int i = 0; i < kNumHandledSignals; ++i) {
 		sigaddset(&act.sa_mask, kExceptionSignals[i]);
 	}
-	
+
 	act.sa_sigaction = SignalHandler;
 	act.sa_flags = SA_ONSTACK | SA_SIGINFO;
 
@@ -233,15 +237,15 @@ LONG CALLBACK BreakpadVectoredHandler(_In_ PEXCEPTION_POINTERS ExceptionInfo)
 		default:
 			return EXCEPTION_CONTINUE_SEARCH;
 	}
-	
+
 	if (handler->WriteMinidumpForException(ExceptionInfo))
 	{
 		// Stop the handler thread from deadlocking us.
 		delete handler;
-		
+
 		// Stop Valve's handler being called.
 		ExceptionInfo->ExceptionRecord->ExceptionCode = EXCEPTION_BREAKPOINT;
-		
+
 		return EXCEPTION_EXECUTE_HANDLER;
 	} else {
 		return EXCEPTION_CONTINUE_SEARCH;
@@ -270,12 +274,24 @@ static bool dumpCallback(const wchar_t* dump_path,
 		return succeeded;
 	}
 
+	fprintf(extra, "-------- CONFIG BEGIN --------");
+	fprintf(extra, "\nMap=%s", crashMap);
+	fprintf(extra, "\nGamePath=%s", crashGamePath);
+	fprintf(extra, "\nCommandLine=%s", crashCommandLine);
+	fprintf(extra, "\nSourceModPath=%s", crashSourceModPath);
+	fprintf(extra, "\nGameDirectory=%s", crashGameDirectory);
+	fprintf(extra, "\nExtensionVersion=%s", crashExtensionVersion);
+	fprintf(extra, "%s", steamInf);
+	fprintf(extra, "\n-------- CONFIG END --------\n");
+
 	if (GetSpew) {
 		GetSpew(spewBuffer, sizeof(spewBuffer));
-		fprintf(extra, "-------- CONSOLE HISTORY BEGIN --------\n%s-------- CONSOLE HISTORY END --------\n", spewBuffer);
+		if (strlen(spewBuffer) > 0) {
+			fprintf(extra, "-------- CONSOLE HISTORY BEGIN --------\n%s-------- CONSOLE HISTORY END --------\n", spewBuffer);
+		}
 	}
 
-        fclose(extra);
+  fclose(extra);
 
 	return succeeded;
 }
@@ -308,7 +324,7 @@ bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen)
 	const char *minidumpUrl = g_pSM->GetCoreConfigValue("MinidumpUrl");
 	if (!minidumpUrl) minidumpUrl = "http://crash.limetech.org/submit";
 
-	bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);	
+	bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);
 
 	if (response) {
 		if (uploaded) {
@@ -417,7 +433,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, gameconfigError, sizeof(gameconfigError))) {
 		smutils->LogError(myself, "WARNING: Failed to load gamedata file, console output and command line will not be included in crash reports: %s", gameconfigError);
 	} else if (!gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
-		smutils->LogError(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
+		smutils->LogMessage(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
 	} else if (!GetSpew) {
 		smutils->LogError(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
 	}
@@ -429,7 +445,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	struct sigaction oact;
 	sigaction(SIGSEGV, NULL, &oact);
 	SignalHandler = oact.sa_sigaction;
-	
+
 	g_pSM->AddGameFrameHook(OnGameFrame);
 #elif defined _WINDOWS
 	wchar_t *buf = new wchar_t[sizeof(dumpStoragePath)];
@@ -438,7 +454,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	handler = new google_breakpad::ExceptionHandler(std::wstring(buf, num_chars), NULL, dumpCallback, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL);
 
 	vectoredHandler = AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
-	
+
 	delete buf;
 #else
 #error Bad platform.
@@ -474,7 +490,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	return true;
 }
 
-void Accelerator::SDK_OnUnload() 
+void Accelerator::SDK_OnUnload()
 {
 #if defined _LINUX
 	g_pSM->RemoveGameFrameHook(OnGameFrame);
@@ -534,5 +550,38 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
 	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 	strncpy(crashExtensionVersion, SMEXT_CONF_VERSION, sizeof(crashExtensionVersion) - 1);
-}
 
+	char steamInfPath[512];
+	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
+
+	char steamInfTemp[256] = {0};
+	FILE *f = fopen(steamInfPath, "rb");
+	fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, f);
+	fclose(f);
+
+	// This is horrible, but I'm busy and this is
+	// the first thing I thought of that would work.
+	unsigned source = 0;
+	strcat(steamInf, "\nSteam_");
+	unsigned target = strlen(steamInf);
+	while (true) {
+		if (steamInfTemp[source] == '\0') {
+			source++;
+			break;
+		}
+		if (steamInfTemp[source] == '\r') {
+			source++;
+			continue;
+		}
+		if (steamInfTemp[source] == '\n') {
+			source++;
+			if (steamInfTemp[source] == '\0') {
+				break;
+			}
+			strcat(steamInf, "\nSteam_");
+			target = strlen(steamInf);
+			continue;
+		}
+		steamInf[target++] = steamInfTemp[source++];
+	}
+}
