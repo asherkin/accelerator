@@ -554,13 +554,19 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 	char steamInfPath[512];
 	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
 
-	char steamInfTemp[256] = {0};
 	FILE *f = fopen(steamInfPath, "rb");
+	if (!f) {
+		return;
+	}
+
+	char steamInfTemp[256] = {0};
 	fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, f);
+
 	fclose(f);
 
 	// This is horrible, but I'm busy and this is
 	// the first thing I thought of that would work.
+	steamInf[0] = '\0';
 	unsigned source = 0;
 	strcat(steamInf, "\nSteam_");
 	unsigned target = strlen(steamInf);
