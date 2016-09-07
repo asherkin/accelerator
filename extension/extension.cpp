@@ -566,9 +566,8 @@ void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int client
 
 	// This is horrible, but I'm busy and this is
 	// the first thing I thought of that would work.
-	steamInf[0] = '\0';
 	unsigned source = 0;
-	strcat(steamInf, "\nSteam_");
+	strcpy(steamInf, "\nSteam_");
 	unsigned target = strlen(steamInf);
 	while (true) {
 		if (steamInfTemp[source] == '\0') {
