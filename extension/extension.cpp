@@ -53,7 +53,6 @@ char crashGamePath[512];
 char crashCommandLine[1024];
 char crashSourceModPath[512];
 char crashGameDirectory[256];
-char crashExtensionVersion[32];
 char steamInf[512];
 
 char dumpStoragePath[512];
@@ -124,7 +123,9 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 	sys_write(extra, "\nGameDirectory=", 15);
 	sys_write(extra, crashGameDirectory, my_strlen(crashGameDirectory));
 	sys_write(extra, "\nExtensionVersion=", 18);
-	sys_write(extra, crashExtensionVersion, my_strlen(crashExtensionVersion));
+	sys_write(extra, SM_VERSION, my_strlen(SM_VERSION));
+	sys_write(extra, "\nExtensionBuild=", 16);
+	sys_write(extra, SM_BUILD_UNIQUEID, my_strlen(SM_BUILD_UNIQUEID));
 	sys_write(extra, steamInf, my_strlen(steamInf));
 	sys_write(extra, "\n-------- CONFIG END --------\n", 30);
 
@@ -280,7 +281,8 @@ static bool dumpCallback(const wchar_t* dump_path,
 	fprintf(extra, "\nCommandLine=%s", crashCommandLine);
 	fprintf(extra, "\nSourceModPath=%s", crashSourceModPath);
 	fprintf(extra, "\nGameDirectory=%s", crashGameDirectory);
-	fprintf(extra, "\nExtensionVersion=%s", crashExtensionVersion);
+	fprintf(extra, "\nExtensionVersion=%s", SM_VERSION);
+	fprintf(extra, "\nExtensionBuild=%s", SM_BUILD_UNIQUEID);
 	fprintf(extra, "%s", steamInf);
 	fprintf(extra, "\n-------- CONFIG END --------\n");
 
@@ -524,7 +526,6 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	strncpy(crashCommandLine, GetCmdLine(), sizeof(crashCommandLine) - 1);
 	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
 	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
-	strncpy(crashExtensionVersion, SMEXT_CONF_VERSION, sizeof(crashExtensionVersion) - 1);
 
 	char steamInfPath[512];
 	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
