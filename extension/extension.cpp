@@ -529,38 +529,36 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	char steamInfPath[512];
 	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
 
-	FILE *f = fopen(steamInfPath, "rb");
-	if (!f) {
-		return;
-	}
+	FILE *steamInfFile = fopen(steamInfPath, "rb");
+	if (steamInfFile) {
+		char steamInfTemp[256] = {0};
+		fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, steamInfFile);
 
-	char steamInfTemp[256] = {0};
-	fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, f);
+		fclose(steamInfFile);
 
-	fclose(f);
-
-	unsigned source = 0;
-	strcpy(steamInf, "\nSteam_");
-	unsigned target = 7; // strlen("\nSteam_");
-	while (true) {
-		if (steamInfTemp[source] == '\0') {
-			source++;
-			break;
-		}
-		if (steamInfTemp[source] == '\r') {
-			source++;
-			continue;
-		}
-		if (steamInfTemp[source] == '\n') {
-			source++;
+		unsigned source = 0;
+		strcpy(steamInf, "\nSteam_");
+		unsigned target = 7; // strlen("\nSteam_");
+		while (true) {
 			if (steamInfTemp[source] == '\0') {
+				source++;
 				break;
 			}
-			strcpy(&steamInf[target], "\nSteam_");
-			target += 7;
-			continue;
+			if (steamInfTemp[source] == '\r') {
+				source++;
+				continue;
+			}
+			if (steamInfTemp[source] == '\n') {
+				source++;
+				if (steamInfTemp[source] == '\0') {
+					break;
+				}
+				strcpy(&steamInf[target], "\nSteam_");
+				target += 7;
+				continue;
+			}
+			steamInf[target++] = steamInfTemp[source++];
 		}
-		steamInf[target++] = steamInfTemp[source++];
 	}
 
 	if (late) {
