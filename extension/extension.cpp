@@ -408,6 +408,43 @@ class UploadThread: public IThread
 
 } uploadThread;
 
+class VFuncEmptyClass {};
+
+const char *GetCmdLine()
+{
+	static int getCmdLineOffset = 0;
+	if (getCmdLineOffset == 0) {
+		if (!gameconfig || !gameconfig->GetOffset("GetCmdLine", &getCmdLineOffset)) {
+			return "";
+		}
+		if (getCmdLineOffset == 0) {
+			return "";
+		}
+	}
+
+	void *cmdline = gamehelpers->GetValveCommandLine();
+	void **vtable = *(void ***)cmdline;
+	void *vfunc = vtable[getCmdLineOffset];
+
+	union {
+		const char *(VFuncEmptyClass::*mfpnew)();
+#ifndef WIN32
+		struct {
+			void *addr;
+			intptr_t adjustor;
+		} s;
+	} u;
+	u.s.addr = vfunc;
+	u.s.adjustor = 0;
+#else
+		void *addr;
+	} u;
+	u.addr = vfunc;
+#endif
+
+	return (const char *)(reinterpret_cast<VFuncEmptyClass*>(cmdline)->*u.mfpnew)();
+}
+
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	sharesys->AddDependency(myself, "webternet.ext", true, true);
@@ -483,6 +520,49 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	delete i;
 #endif
 
+	strncpy(crashGamePath, g_pSM->GetGamePath(), sizeof(crashGamePath) - 1);
+	strncpy(crashCommandLine, GetCmdLine(), sizeof(crashCommandLine) - 1);
+	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
+	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
+	strncpy(crashExtensionVersion, SMEXT_CONF_VERSION, sizeof(crashExtensionVersion) - 1);
+
+	char steamInfPath[512];
+	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
+
+	FILE *f = fopen(steamInfPath, "rb");
+	if (!f) {
+		return;
+	}
+
+	char steamInfTemp[256] = {0};
+	fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, f);
+
+	fclose(f);
+
+	unsigned source = 0;
+	strcpy(steamInf, "\nSteam_");
+	unsigned target = 7; // strlen("\nSteam_");
+	while (true) {
+		if (steamInfTemp[source] == '\0') {
+			source++;
+			break;
+		}
+		if (steamInfTemp[source] == '\r') {
+			source++;
+			continue;
+		}
+		if (steamInfTemp[source] == '\n') {
+			source++;
+			if (steamInfTemp[source] == '\0') {
+				break;
+			}
+			strcpy(&steamInf[target], "\nSteam_");
+			target += 7;
+			continue;
+		}
+		steamInf[target++] = steamInfTemp[source++];
+	}
+
 	if (late) {
 		this->OnCoreMapStart(NULL, 0, 0);
 	}
@@ -505,88 +585,7 @@ void Accelerator::SDK_OnUnload()
 	delete handler;
 }
 
-class VFuncEmptyClass {};
-
-const char *GetCmdLine()
-{
-	static int getCmdLineOffset = 0;
-	if (getCmdLineOffset == 0) {
-		if (!gameconfig || !gameconfig->GetOffset("GetCmdLine", &getCmdLineOffset)) {
-			return "";
-		}
-		if (getCmdLineOffset == 0) {
-			return "";
-		}
-	}
-
-	void *cmdline = gamehelpers->GetValveCommandLine();
-	void **vtable = *(void ***)cmdline;
-	void *vfunc = vtable[getCmdLineOffset];
-
-	union {
-		const char *(VFuncEmptyClass::*mfpnew)();
-#ifndef WIN32
-		struct {
-			void *addr;
-			intptr_t adjustor;
-		} s;
-	} u;
-	u.s.addr = vfunc;
-	u.s.adjustor = 0;
-#else
-		void *addr;
-	} u;
-	u.addr = vfunc;
-#endif
-
-	return (const char *)(reinterpret_cast<VFuncEmptyClass*>(cmdline)->*u.mfpnew)();
-}
-
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
 	strncpy(crashMap, gamehelpers->GetCurrentMap(), sizeof(crashMap) - 1);
-	strncpy(crashGamePath, g_pSM->GetGamePath(), sizeof(crashGamePath) - 1);
-	strncpy(crashCommandLine, GetCmdLine(), sizeof(crashCommandLine) - 1);
-	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
-	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
-	strncpy(crashExtensionVersion, SMEXT_CONF_VERSION, sizeof(crashExtensionVersion) - 1);
-
-	char steamInfPath[512];
-	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
-
-	FILE *f = fopen(steamInfPath, "rb");
-	if (!f) {
-		return;
-	}
-
-	char steamInfTemp[256] = {0};
-	fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, f);
-
-	fclose(f);
-
-	// This is horrible, but I'm busy and this is
-	// the first thing I thought of that would work.
-	unsigned source = 0;
-	strcpy(steamInf, "\nSteam_");
-	unsigned target = strlen(steamInf);
-	while (true) {
-		if (steamInfTemp[source] == '\0') {
-			source++;
-			break;
-		}
-		if (steamInfTemp[source] == '\r') {
-			source++;
-			continue;
-		}
-		if (steamInfTemp[source] == '\n') {
-			source++;
-			if (steamInfTemp[source] == '\0') {
-				break;
-			}
-			strcat(steamInf, "\nSteam_");
-			target = strlen(steamInf);
-			continue;
-		}
-		steamInf[target++] = steamInfTemp[source++];
-	}
 }
