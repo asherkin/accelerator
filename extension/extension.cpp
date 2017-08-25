@@ -470,11 +470,11 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	char gameconfigError[256];
 	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, gameconfigError, sizeof(gameconfigError))) {
-		smutils->LogError(myself, "WARNING: Failed to load gamedata file, console output and command line will not be included in crash reports: %s", gameconfigError);
+		smutils->LogMessage(myself, "WARNING: Failed to load gamedata file, console output and command line will not be included in crash reports: %s", gameconfigError);
 	} else if (!gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
 		smutils->LogMessage(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
 	} else if (!GetSpew) {
-		smutils->LogError(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
+		smutils->LogMessage(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
 	}
 
 #if defined _LINUX
