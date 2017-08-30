@@ -21,6 +21,7 @@ def BuildBreakpad():
 
 		breakpad.AddCommand(ShellCommand('CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ' + os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'configure')))
 		breakpad.AddCommand(ShellCommand('make src/client/linux/libbreakpad_client.a'))
+		breakpad.AddCommand(ShellCommand('make src/libbreakpad.a src/third_party/libdisasm/libdisasm.a'))
 
 	elif AMBuild.target['platform'] in ['windows']:
 		if osutil.FileExists(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib')):
