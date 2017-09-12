@@ -45,6 +45,10 @@ IGameConfig *gameconfig;
 
 typedef void (*GetSpew_t)(char *buffer, unsigned int length);
 GetSpew_t GetSpew;
+#if defined _WINDOWS
+typedef void(__fastcall *GetSpewf_t)(char *buffer, unsigned int length);
+GetSpewf_t GetSpewf;
+#endif
 
 char spewBuffer[65536]; // Hi.
 
@@ -286,8 +290,12 @@ static bool dumpCallback(const wchar_t* dump_path,
 	fprintf(extra, "%s", steamInf);
 	fprintf(extra, "\n-------- CONFIG END --------\n");
 
-	if (GetSpew) {
-		GetSpew(spewBuffer, sizeof(spewBuffer));
+	if (GetSpew || GetSpewf) {
+		if (GetSpew)
+			GetSpew(spewBuffer, sizeof(spewBuffer));
+		else if (GetSpewf)
+			GetSpewf(spewBuffer, sizeof(spewBuffer));
+
 		if (strlen(spewBuffer) > 0) {
 			fprintf(extra, "-------- CONSOLE HISTORY BEGIN --------\n%s-------- CONSOLE HISTORY END --------\n", spewBuffer);
 		}
@@ -476,6 +484,15 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	} else if (!GetSpew) {
 		smutils->LogMessage(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
 	}
+
+#if defined _WINDOWS
+	const char *fastcall = gameconfig->GetKeyValue("UseFastcall");
+	if (fastcall && !strcmp(fastcall, "yes"))
+	{
+		GetSpewf = (GetSpewf_t)GetSpew;
+		GetSpew = nullptr;
+	}
+#endif
 
 #if defined _LINUX
 	google_breakpad::MinidumpDescriptor descriptor(dumpStoragePath);
