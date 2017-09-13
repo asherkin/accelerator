@@ -8,7 +8,7 @@ compiler:
   - clang
 before_script:
   - cd ..
-  - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.5
+  - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.7
   - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
   - cd ambuild && python setup.py install --user
   - cd $TRAVIS_BUILD_DIR

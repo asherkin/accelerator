@@ -45,9 +45,9 @@ def BuildExtension():
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension'))
 
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public'))
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'extensions'))
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD15'], 'public', 'sourcepawn'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD'], 'public'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD'], 'public', 'extensions'))
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD'], 'public', 'sourcepawn'))
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src'))
 
@@ -64,7 +64,7 @@ def BuildExtension():
 		'MemoryDownloader.cpp',
 	])
 
-	binary.AddSourceFiles(AMBuild.cache['SOURCEMOD15'], ['public/smsdk_ext.cpp'])
+	binary.AddSourceFiles(AMBuild.cache['SOURCEMOD'], ['public/smsdk_ext.cpp'])
 
 	if AMBuild.target['platform'] in ['linux']:
 		link = os.path.join(AMBuild.outputFolder, extension.workFolder, 'libbreakpad_client.a')
