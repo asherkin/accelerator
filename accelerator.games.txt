@@ -76,4 +76,27 @@
 			}
 		}
 	}
+
+	"csgo"
+	{
+		"Keys"
+		{
+			"UseFastcall"	"yes"
+		}
+
+		"Signatures"
+		{
+			"GetSpew"
+			{
+				"library" "engine"
+				"linux" "\x55\x89\xE5\x57\x56\x53\x83\xEC\x2C\x8B\x5D\x08\xE8\x2A\x2A\x2A\x2A\x89\xC2\xA1\x2A\x2A\x2A\x2A"
+			}
+
+			"GetSpewFastcall"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x51\x53\x56\x57\x8B\xFA\x8B\xD9"
+			}
+		}
+	}
 }

@@ -45,6 +45,10 @@ IGameConfig *gameconfig;
 
 typedef void (*GetSpew_t)(char *buffer, unsigned int length);
 GetSpew_t GetSpew;
+#if defined _WINDOWS
+typedef void(__fastcall *GetSpewFastcall_t)(char *buffer, unsigned int length);
+GetSpewFastcall_t GetSpewFastcall;
+#endif
 
 char spewBuffer[65536]; // Hi.
 
@@ -131,6 +135,7 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 
 	if (GetSpew) {
 		GetSpew(spewBuffer, sizeof(spewBuffer));
+
 		if (my_strlen(spewBuffer) > 0) {
 			sys_write(extra, "-------- CONSOLE HISTORY BEGIN --------\n", 40);
 			sys_write(extra, spewBuffer, my_strlen(spewBuffer));
@@ -286,14 +291,19 @@ static bool dumpCallback(const wchar_t* dump_path,
 	fprintf(extra, "%s", steamInf);
 	fprintf(extra, "\n-------- CONFIG END --------\n");
 
-	if (GetSpew) {
-		GetSpew(spewBuffer, sizeof(spewBuffer));
+	if (GetSpew || GetSpewFastcall) {
+		if (GetSpew) {
+			GetSpew(spewBuffer, sizeof(spewBuffer));
+		} else if (GetSpewFastcall) {
+			GetSpewFastcall(spewBuffer, sizeof(spewBuffer));
+		}
+
 		if (strlen(spewBuffer) > 0) {
 			fprintf(extra, "-------- CONSOLE HISTORY BEGIN --------\n%s-------- CONSOLE HISTORY END --------\n", spewBuffer);
 		}
 	}
 
-  fclose(extra);
+	fclose(extra);
 
 	return succeeded;
 }
@@ -468,14 +478,42 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	threader->MakeThread(&uploadThread);
 
-	char gameconfigError[256];
-	if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, gameconfigError, sizeof(gameconfigError))) {
-		smutils->LogMessage(myself, "WARNING: Failed to load gamedata file, console output and command line will not be included in crash reports: %s", gameconfigError);
-	} else if (!gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
-		smutils->LogMessage(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
-	} else if (!GetSpew) {
-		smutils->LogMessage(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
-	}
+	do {
+		char gameconfigError[256];
+		if (!gameconfs->LoadGameConfigFile("accelerator.games", &gameconfig, gameconfigError, sizeof(gameconfigError))) {
+			smutils->LogMessage(myself, "WARNING: Failed to load gamedata file, console output and command line will not be included in crash reports: %s", gameconfigError);
+			break;
+		}
+
+		bool useFastcall = false;
+
+
+#if defined _WINDOWS
+		const char *fastcall = gameconfig->GetKeyValue("UseFastcall");
+		if (fastcall && strcmp(fastcall, "yes") == 0) {
+			useFastcall = true;
+		}
+
+		if (useFastcall && !gameconfig->GetMemSig("GetSpewFastcall", (void **)&GetSpewFastcall)) {
+			smutils->LogMessage(myself, "WARNING: GetSpewFastcall not found in gamedata, console output will not be included in crash reports.");
+			break;
+		}
+#endif
+
+		if (!useFastcall && !gameconfig->GetMemSig("GetSpew", (void **)&GetSpew)) {
+			smutils->LogMessage(myself, "WARNING: GetSpew not found in gamedata, console output will not be included in crash reports.");
+			break;
+		}
+
+		if (!GetSpew
+#if defined _WINDOWS
+			&& !GetSpewFastcall
+#endif
+		) {
+			smutils->LogMessage(myself, "WARNING: Sigscan for GetSpew failed, console output will not be included in crash reports.");
+			break;
+		}
+	} while(false);
 
 #if defined _LINUX
 	google_breakpad::MinidumpDescriptor descriptor(dumpStoragePath);
