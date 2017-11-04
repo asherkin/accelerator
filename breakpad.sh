@@ -25,8 +25,4 @@ cd build
 
 ../src/configure --enable-m32
 
-find /usr/include/ -type f -iname 'a.out.h'
-
-cat config.log
-
 make src/tools/linux/dump_syms/dump_syms
