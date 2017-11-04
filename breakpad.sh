@@ -23,6 +23,6 @@ fi
 
 cd build
 
-CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ../src/configure
+../src/configure --enable-m32
 
 make src/tools/linux/dump_syms/dump_syms
