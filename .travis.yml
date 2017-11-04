@@ -4,6 +4,7 @@ addons:
   apt:
     packages:
       - g++-multilib
+      - libc6-dev:i386
 compiler:
   - clang
 before_script:
