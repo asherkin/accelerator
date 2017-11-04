@@ -14,6 +14,7 @@ before_script:
   - cd $TRAVIS_BUILD_DIR
   - git fetch --unshallow || true
   - ./breakpad.sh && export PATH=$PATH:$PWD/breakpad/build/src/tools/linux/dump_syms/
+  - cat breakpad/build/config.log
 script:
   - mkdir build && cd build
   - python ../configure.py --enable-optimize
