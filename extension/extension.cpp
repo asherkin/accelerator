@@ -57,7 +57,7 @@ char crashGamePath[512];
 char crashCommandLine[1024];
 char crashSourceModPath[512];
 char crashGameDirectory[256];
-char steamInf[512];
+char steamInf[1024];
 
 char dumpStoragePath[512];
 char logPath[512];
@@ -570,11 +570,13 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	FILE *steamInfFile = fopen(steamInfPath, "rb");
 	if (steamInfFile) {
-		char steamInfTemp[256] = {0};
+		char steamInfTemp[1024] = {0};
 		fread(steamInfTemp, sizeof(char), sizeof(steamInfTemp) - 1, steamInfFile);
 
 		fclose(steamInfFile);
 
+		unsigned commentChars = 0;
+		unsigned valueChars = 0;
 		unsigned source = 0;
 		strcpy(steamInf, "\nSteam_");
 		unsigned target = 7; // strlen("\nSteam_");
@@ -583,20 +585,39 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 				source++;
 				break;
 			}
+			if (steamInfTemp[source] == '/') {
+				source++;
+				commentChars++;
+				continue;
+			}
+			if (commentChars == 1) {
+				commentChars = 0;
+				steamInf[target++] = '/';
+				valueChars++;
+			}
 			if (steamInfTemp[source] == '\r') {
 				source++;
 				continue;
 			}
 			if (steamInfTemp[source] == '\n') {
+				commentChars = 0;
 				source++;
 				if (steamInfTemp[source] == '\0') {
 					break;
 				}
-				strcpy(&steamInf[target], "\nSteam_");
-				target += 7;
+				if (valueChars > 0) {
+					valueChars = 0;
+					strcpy(&steamInf[target], "\nSteam_");
+					target += 7;
+				}
+				continue;
+			}
+			if (commentChars >= 2) {
+				source++;
 				continue;
 			}
 			steamInf[target++] = steamInfTemp[source++];
+			valueChars++;
 		}
 	}
 
