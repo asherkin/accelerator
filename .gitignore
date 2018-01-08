@@ -1,3 +1,10 @@
 /build
 /extension/version_auto.h
 /breakpad
+/package
+/test
+/test-crash-dump-generation
+/accelerator.ext
+
+.ambuild
+.vscode
