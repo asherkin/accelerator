@@ -43,6 +43,13 @@ SMEXT_LINK(&g_accelerator);
 IWebternet *webternet;
 IGameConfig *gameconfig;
 
+IForward *g_pOnCrashUploaded = nullptr;
+
+struct crashIdPack {
+	int id;
+	char crashId[20];
+};
+
 typedef void (*GetSpew_t)(char *buffer, unsigned int length);
 GetSpew_t GetSpew;
 #if defined _WINDOWS
@@ -184,6 +191,18 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 	sys_close(extra);
 
 	return succeeded;
+}
+
+static void OnCrashUpload(void *object)
+{
+	crashIdPack *pack = reinterpret_cast<crashIdPack *>(object);
+	if( pack != nullptr ) {
+		g_pOnCrashUploaded->PushCell(pack->id);
+		g_pOnCrashUploaded->PushString(pack->crashId);
+		g_pOnCrashUploaded->Execute();
+
+		delete pack;
+	}
 }
 
 void OnGameFrame(bool simulating)
@@ -394,6 +413,13 @@ class UploadThread: public IThread
 
 			if (uploaded) {
 				count++;
+
+				crashIdPack *pack = new crashIdPack;
+				pack->id = count;
+				strncpy( pack->crashId, response + 10, 14);
+
+				smutils->AddFrameAction(OnCrashUpload, pack);
+
 				g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
 				if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
 			} else {
@@ -475,8 +501,6 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	}
 
 	g_pSM->BuildPath(Path_SM, logPath, sizeof(logPath), "logs/accelerator.log");
-
-	threader->MakeThread(&uploadThread);
 
 	do {
 		char gameconfigError[256];
@@ -640,7 +664,17 @@ void Accelerator::SDK_OnUnload()
 #error Bad platform.
 #endif
 
+	forwards->ReleaseForward(g_pOnCrashUploaded);
 	delete handler;
+}
+
+// Start thread later so they have time to call forward
+void Accelerator::SDK_OnAllLoaded()
+{
+	// Create Global Forward
+	g_pOnCrashUploaded = forwards->CreateForward("OnCrashUpdated", ET_Ignore, 2, NULL, Param_Cell, Param_String);
+
+	threader->MakeThread(&uploadThread);
 }
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
