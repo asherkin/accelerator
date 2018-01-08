@@ -416,7 +416,8 @@ class UploadThread: public IThread
 
 				crashIdPack *pack = new crashIdPack;
 				pack->id = count;
-				strncpy( pack->crashId, response + 10, 14);
+				memcpy(pack->crashId, response + 10, 14);
+				pack->crashId[14] = '\0';
 
 				smutils->AddFrameAction(OnCrashUpload, pack);
 
