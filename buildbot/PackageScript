@@ -71,6 +71,7 @@ folders = [
 	['addons', 'sourcemod', 'configs'],
 	['addons', 'sourcemod', 'gamedata'],
 	['addons', 'sourcemod', 'extensions'],
+	['addons', 'sourcemod', 'scripting', 'include'],
 ]
 
 #Setup
@@ -79,6 +80,7 @@ job.AddCommand(CreateFolders(folders))
 
 job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.games.txt'), os.path.join('addons', 'sourcemod', 'gamedata')))
 job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.autoload'), os.path.join('addons', 'sourcemod', 'extensions')))
+job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.inc'), os.path.join('addons', 'sourcemod', 'scripting','include')))
 
 bincopies = []
 
