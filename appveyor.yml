@@ -17,6 +17,7 @@ build_script:
   - cd build
   - C:\python27\python.exe ..\configure.py --enable-optimize
   - C:\python27\python.exe build.py
+test: off
 on_success:
   - C:\python27\python.exe ..\upload.py
 #on_finish:
