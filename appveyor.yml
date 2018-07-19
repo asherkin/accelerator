@@ -1,7 +1,7 @@
 version: '{build}'
-os: Visual Studio 2013
+os: Visual Studio 2015
 environment:
-  GYP_MSVS_VERSION: '2013'
+  GYP_MSVS_VERSION: '2015'
 install:
   - cd ..
   - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod sourcemod-1.7
@@ -11,7 +11,7 @@ install:
   - cd %APPVEYOR_BUILD_FOLDER%
   - breakpad.bat
 build_script:
-  - '"%VS120COMNTOOLS%\vsvars32.bat"'
+  - '"%VS140COMNTOOLS%\vsvars32.bat"'
   - mkdir build
   - cd build
   - C:\python27\python.exe ..\configure.py --enable-optimize
