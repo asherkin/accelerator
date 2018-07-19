@@ -16,10 +16,6 @@
 
 #include <streambuf>
 
-extern "C" {
-#include "sha256.h"
-}
-
 using google_breakpad::MinidumpDescriptor;
 using google_breakpad::ExceptionHandler;
 
@@ -30,6 +26,7 @@ using google_breakpad::ProcessResult;
 using google_breakpad::CallStack;
 using google_breakpad::StackFrame;
 using google_breakpad::PathnameStripper;
+using google_breakpad::CodeModule;
 
 sigjmp_buf envbuf;
 char path[1024];
@@ -73,6 +70,16 @@ int main(int argc, char *argv[])
 		argc = 2;
 	}
 
+#define ONELINE
+
+#ifdef ONELINE
+# define CRPRE "|"
+# define CRPOST ""
+#else
+# define CRPRE ""
+# define CRPOST "\n"
+#endif
+
 	for (int i = 1; i < argc; ++i) {
 		if (!generateCrash) {
 			my_strlcpy(path, argv[i], sizeof(path));
@@ -108,37 +115,35 @@ int main(int argc, char *argv[])
 			frameCount = 10;
 		}
 
-		SHA256_CTX hashctx;
-		sha256_init(&hashctx);
+		printf("1|%d|%s|%x|%d" CRPOST, processState.crashed(), processState.crash_reason().c_str(), (intptr_t)processState.crash_address(), requestingThread);
 
-		sha256_update(&hashctx, (const unsigned char *)processState.crash_reason().data(), processState.crash_reason().length());
+		std::map<const CodeModule *, unsigned int> moduleMap;
 
-		//printf("1|%d|%s|%x|%d", processState.crashed(), processState.crash_reason().c_str(), (intptr_t)processState.crash_address(), requestingThread);
+		unsigned int moduleCount = processState.modules()->module_count();
+		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
+			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
+			moduleMap[module] = moduleIndex;
+
+			auto debugFile = PathnameStripper::File(module->debug_file());
+			auto debugIdentifier = module->debug_identifier();
+			printf(CRPRE "M|%s|%s" CRPOST, debugFile.c_str(), debugIdentifier.c_str());
+		}
+
 		for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
 			const StackFrame *frame = stack->frames()->at(frameIndex);
 			if (frame->module) {
-				auto codeFile = PathnameStripper::File(frame->module->code_file());
-				auto debugId = frame->module->debug_identifier();
+				auto moduleIndex = moduleMap[frame->module];
 				auto moduleOffset = frame->ReturnAddress() - frame->module->base_address();
 
-				sha256_update(&hashctx, (const unsigned char *)codeFile.data(), codeFile.length());
-				sha256_update(&hashctx, (const unsigned char *)debugId.data(), debugId.length());
-				sha256_update(&hashctx, (const unsigned char *)&moduleOffset, sizeof(moduleOffset));
-
-				//printf("|%d|%s|%s|%x", frame->trust, codeFile.c_str(), debugId.c_str(), (intptr_t)moduleOffset);
+				printf(CRPRE "F|%d|%x" CRPOST, moduleIndex, (intptr_t)moduleOffset);
 			} else {
-				//printf("|%d|||%x", frame->trust, (intptr_t)frame->ReturnAddress());
+				printf(CRPRE "F|%d|%x" CRPOST, -1, (intptr_t)frame->ReturnAddress());
 			}
 		}
-		//printf("\n");
 
-		unsigned char hash[SHA256_BLOCK_SIZE];
-		sha256_final(&hashctx, hash);
-
-		for (int c = 0; c < SHA256_BLOCK_SIZE; ++c) {
-			printf("%02x", hash[c]);
-		}
+#ifdef ONELINE
 		printf("\n");
+#endif
 	}
 
 	if (generateCrash) {

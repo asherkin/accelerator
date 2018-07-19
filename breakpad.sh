@@ -26,3 +26,5 @@ cd build
 ../src/configure --enable-m32
 
 make src/tools/linux/dump_syms/dump_syms
+make src/client/linux/libbreakpad_client.a
+make src/libbreakpad.a src/third_party/libdisasm/libdisasm.a

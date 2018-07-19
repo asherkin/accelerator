@@ -23,19 +23,18 @@ def BuildEverything():
 
 	binary.AddSourceFiles('test', [
 		'test.cpp',
-		'sha256.c',
 	])
 
 	if AMBuild.target['platform'] in ['linux']:
 		libs = [
-			('libbreakpad_client.a', os.path.join('breakpad', 'src', 'client', 'linux', 'libbreakpad_client.a')),
-			('libbreakpad.a', os.path.join('breakpad', 'src', 'libbreakpad.a')),
-			('libdisasm.a', os.path.join('breakpad', 'src', 'third_party', 'libdisasm', 'libdisasm.a')),
+			('libbreakpad_client.a', os.path.join('breakpad', 'build', 'src', 'client', 'linux', 'libbreakpad_client.a')),
+			('libbreakpad.a', os.path.join('breakpad', 'build', 'src', 'libbreakpad.a')),
+			('libdisasm.a', os.path.join('breakpad', 'build', 'src', 'third_party', 'libdisasm', 'libdisasm.a')),
 		]
 
 		for lib, target in libs:
 			link = os.path.join(AMBuild.outputFolder, extension.workFolder, lib)
-			target = os.path.join(AMBuild.outputFolder, target)
+			target = os.path.join(AMBuild.sourceFolder, target)
 			try:
 				os.lstat(link)
 			except:
