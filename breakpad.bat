@@ -1,3 +1,5 @@
+@echo on
+
 IF EXIST breakpad\NUL GOTO HASBREAKPAD
 mkdir breakpad
 :HASBREAKPAD
@@ -18,15 +20,15 @@ IF EXIST gyp\NUL GOTO HASGYP
 git clone --depth=1 --branch=master https://chromium.googlesource.com/external/gyp.git gyp
 :HASGYP
 
-IF EXIST build\NUL GOTO HASBUILD
-mkdir build
-:HASBUILD
-cd build
+powershell -Command "& {(Get-Content src\src\build\common.gypi).replace('''WarnAsError'': ''true'',', '''WarnAsError'': ''false'',') | Set-Content src\src\build\common.gypi}"
 
-..\gyp\gyp.bat --no-circular-check ..\src\src\client\windows\handler\exception_handler.gyp
-msbuild ..\src\src\client\windows\handler\exception_handler.sln /m /p:Configuration=Release
+cmd /c gyp\gyp.bat --no-circular-check src\src\client\windows\handler\exception_handler.gyp
+msbuild src\src\client\windows\handler\exception_handler.sln /m /p:Configuration=Release
 
-..\gyp\gyp.bat --no-circular-check ..\src\src\client\windows\crash_generation\crash_generation.gyp
-msbuild ..\src\src\client\windows\crash_generation\crash_generation.sln /m /p:Configuration=Release
+cmd /c gyp\gyp.bat --no-circular-check src\src\client\windows\crash_generation\crash_generation.gyp
+msbuild src\src\client\windows\crash_generation\crash_generation.sln /m /p:Configuration=Release
 
-cd ..\..
+cmd /c gyp\gyp.bat --no-circular-check src\src\processor\processor.gyp
+msbuild src\src\processor\processor.sln /m /p:Configuration=Release
+
+cd ..

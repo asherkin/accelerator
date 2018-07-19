@@ -116,10 +116,7 @@ def AddHL2Library(name, dest):
 debug_info = []
 
 AddNormalLibrary('accelerator.ext', 'extensions')
-
-
-if AMBuild.target['platform'] == 'linux':
-	AddExecutable('test-crash-dump-generation', 'configs')
+AddExecutable('test-crash-dump-generation', 'configs')
 
 job.AddCommandGroup(bincopies)
 	

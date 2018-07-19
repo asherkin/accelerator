@@ -6,7 +6,7 @@ from ambuild.command import ShellCommand
 from ambuild.command import DirectCommand
 
 def BuildEverything():
-	if AMBuild.target['platform'] not in ['linux']:
+	if AMBuild.target['platform'] not in ['linux', 'windows']:
 		return
 
 	compiler = SM.DefaultCompiler()
@@ -16,6 +16,9 @@ def BuildEverything():
 	if AMBuild.target['platform'] in ['linux']:
 		compiler['POSTLINKFLAGS'].append('-lstdc++')
 		compiler['POSTLINKFLAGS'].append('-pthread')
+	elif compiler.cc.name == 'msvc':
+		compiler['POSTLINKFLAGS'].remove('/SUBSYSTEM:WINDOWS')
+		compiler['POSTLINKFLAGS'].append('/SUBSYSTEM:CONSOLE')
 
 	name = 'test-crash-dump-generation'
 	extension = AMBuild.AddJob(name)
@@ -42,17 +45,18 @@ def BuildEverything():
 			binary.AddObjectFiles([lib])
 
 	elif AMBuild.target['platform'] in ['windows']:
-		libs = ['exception_handler', 'common']
-		for lib in libs:
-			path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', lib + '.lib')
+		libs = [
+		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
+		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
+		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
+		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'libdisasm.lib'),
+		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
+		]
+
+		for path in libs:
 			if os.path.isfile(path):
 				binary.RelinkIfNewer(path)
 			binary['POSTLINKFLAGS'].extend([path])
-
-		path = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib')
-		if os.path.isfile(path):
-			binary.RelinkIfNewer(path)
-		binary['POSTLINKFLAGS'].extend([path])
 
 	SM.ExtractDebugInfo(extension, binary)
 

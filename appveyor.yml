@@ -9,6 +9,7 @@ install:
   - cd ambuild
   - C:\python27\python.exe setup.py install
   - cd %APPVEYOR_BUILD_FOLDER%
+  - '"%VS140COMNTOOLS%\vsvars32.bat"'
   - breakpad.bat
 build_script:
   - '"%VS140COMNTOOLS%\vsvars32.bat"'
@@ -18,3 +19,5 @@ build_script:
   - C:\python27\python.exe build.py
 on_success:
   - C:\python27\python.exe ..\upload.py
+#on_finish:
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
