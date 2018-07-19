@@ -18,4 +18,15 @@ IF EXIST gyp\NUL GOTO HASGYP
 git clone --depth=1 --branch=master https://chromium.googlesource.com/external/gyp.git gyp
 :HASGYP
 
-cd ..
+IF EXIST build\NUL GOTO HASBUILD
+mkdir build
+:HASBUILD
+cd build
+
+..\gyp\gyp.bat --no-circular-check ..\src\src\client\windows\handler\exception_handler.gyp
+msbuild ..\src\src\client\windows\handler\exception_handler.sln /m /p:Configuration=Release
+
+..\gyp\gyp.bat --no-circular-check ..\src\src\client\windows\crash_generation\crash_generation.gyp
+msbuild ..\src\src\client\windows\crash_generation\crash_generation.sln /m /p:Configuration=Release
+
+cd ..\..

@@ -9,32 +9,6 @@ def BuildEverything():
 	if AMBuild.target['platform'] not in ['linux', 'windows']:
 		return
 
-	if AMBuild.target['platform'] in ['windows']:
-		BuildBreakpad()
-
-	BuildExtension();
-
-def BuildBreakpad():
-	breakpad = AMBuild.AddJob('breakpad')
-
-	if osutil.FileExists(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib')):
-		return
-
-	gyp = os.path.join(AMBuild.sourceFolder, 'breakpad', 'gyp', 'gyp.bat')
-
-	gyppath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.gyp')
-	breakpad.AddCommand(DirectCommand([gyp, '--no-circular-check', gyppath]))
-
-	slnpath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'exception_handler.sln')
-	breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
-
-	gyppath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'crash_generation.gyp')
-	breakpad.AddCommand(DirectCommand([gyp, '--no-circular-check', gyppath]))
-
-	slnpath = os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'crash_generation.sln')
-	breakpad.AddCommand(DirectCommand(['msbuild', slnpath, '/p:Configuration=Release']))
-
-def BuildExtension():
 	compiler = SM.DefaultCompiler()
 
 	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension'))
