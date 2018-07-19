@@ -18,6 +18,12 @@ def GITHash():
 	stdout = stdout.decode('UTF-8')
 	return stdout.rstrip('\r\n')
 
+def GITBranch():
+	p = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+	(stdout, stderr) = p.communicate()
+	stdout = stdout.decode('UTF-8')
+	return stdout.rstrip('\r\n')
+
 def GITVersion():
 	p = subprocess.Popen(['git', 'rev-list', '--count', '--first-parent', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 	(stdout, stderr) = p.communicate()
@@ -61,7 +67,7 @@ for zinfo in zip.infolist():
 
 zip.close()
 
-if 'ftp_hostname' in os.environ:
+if 'ftp_hostname' in os.environ and GITBranch() == 'master':
 	print('')
 
 	ftp = ftplib.FTP(os.environ['ftp_hostname'], os.environ['ftp_username'], os.environ['ftp_password'])
