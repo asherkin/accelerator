@@ -2,16 +2,22 @@
 #include "client/linux/handler/exception_handler.h"
 #include "common/linux/linux_libc_support.h"
 #include "third_party/lss/linux_syscall_support.h"
+#include "common/linux/dump_symbols.h"
+#include "common/path_helper.h"
+
+#include <sstream>
 
 #include <signal.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <paths.h>
 
 #define my_jmp_buf sigjmp_buf
 #define my_setjmp(x) sigsetjmp(x, 0)
 #define my_longjmp siglongjmp
 
 using google_breakpad::MinidumpDescriptor;
+using google_breakpad::WriteSymbolFile;
 
 #elif defined _WINDOWS
 #define _STDINT // ~.~
@@ -174,6 +180,54 @@ int main(int argc, char *argv[])
 		}
 
 		printf("\n");
+
+#if defined _LINUX
+		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
+			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
+
+			auto debugFile = module->debug_file();
+			if (debugFile[0] != '/') {
+				continue;
+			}
+
+			printf("%s\n", debugFile.c_str());
+
+			auto debugFileDir = google_breakpad::DirName(debugFile);
+			std::vector<string> debug_dirs{
+				debugFileDir,
+			};
+
+			FILE *saved_stderr = fdopen(dup(fileno(stderr)), "w");
+			if (freopen(_PATH_DEVNULL, "w", stderr)) {
+				// If it fails, not a lot we can (or should) do.
+				// Add this brace section to silence gcc warnings.
+			}
+
+			std::ostringstream outputStream;
+			google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true);
+			if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
+				outputStream.str("");
+				outputStream.clear();
+
+				// Try again without debug dirs.
+				if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+					// TODO: Something.
+				}
+			}
+
+			fflush(stderr);
+			dup2(fileno(saved_stderr), fileno(stderr));
+			fclose(saved_stderr);
+
+
+			// WriteSymbolFileHeaderOnly would do this for us, but this is just for testing.
+			auto output = outputStream.str();
+			output = output.substr(0, output.find("\n"));
+			fprintf(stdout, "%s\n", output.c_str());
+
+			// break;
+		}
+#endif
 	}
 
 	if (generateCrash) {

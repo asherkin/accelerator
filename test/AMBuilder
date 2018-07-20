@@ -11,22 +11,47 @@ def BuildEverything():
 
 	compiler = SM.DefaultCompiler()
 
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src'))
-
 	if AMBuild.target['platform'] in ['linux']:
+		compiler['POSTLINKFLAGS'].append('-lm')
 		compiler['POSTLINKFLAGS'].append('-lstdc++')
 		compiler['POSTLINKFLAGS'].append('-pthread')
+
+		compiler['CDEFINES'].append('HAVE_CONFIG_H')
+		compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'build', 'src'))
 	elif compiler.cc.name == 'msvc':
 		compiler['POSTLINKFLAGS'].remove('/SUBSYSTEM:WINDOWS')
 		compiler['POSTLINKFLAGS'].append('/SUBSYSTEM:CONSOLE')
+
+	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src'))
 
 	name = 'test-crash-dump-generation'
 	extension = AMBuild.AddJob(name)
 	binary = Cpp.ExecutableBuilder(name, AMBuild, extension, compiler)
 
-	binary.AddSourceFiles('test', [
-		'test.cpp',
-	])
+        sourceFiles = [
+            'test.cpp',
+        ]
+
+        if AMBuild.target['platform'] in ['linux']:
+            sourceFiles.extend([
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_cfi_to_module.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_cu_to_module.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_line_to_module.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'language.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'module.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'path_helper.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'stabs_reader.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'stabs_to_module.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'bytereader.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'dwarf2diehandler.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'dwarf2reader.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'elf_reader.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'crc32.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'dump_symbols.cc'),
+                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'elf_symbols_to_module.cc'),
+            ])
+
+	binary.AddSourceFiles('test', sourceFiles);
 
 	if AMBuild.target['platform'] in ['linux']:
 		libs = [
