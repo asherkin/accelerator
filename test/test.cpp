@@ -5,8 +5,6 @@
 #include "common/linux/dump_symbols.h"
 #include "common/path_helper.h"
 
-#include <sstream>
-
 #include <signal.h>
 #include <dirent.h>
 #include <unistd.h>
@@ -18,6 +16,26 @@
 
 using google_breakpad::MinidumpDescriptor;
 using google_breakpad::WriteSymbolFile;
+
+class StderrInhibitor
+{
+	FILE *saved_stderr = nullptr;
+
+public:
+	StderrInhibitor() {
+		saved_stderr = fdopen(dup(fileno(stderr)), "w");
+		if (freopen(_PATH_DEVNULL, "w", stderr)) {
+			// If it fails, not a lot we can (or should) do.
+			// Add this brace section to silence gcc warnings.
+		}
+	}
+
+	~StderrInhibitor() {
+		fflush(stderr);
+		dup2(fileno(saved_stderr), fileno(stderr));
+		fclose(saved_stderr);
+	}
+};
 
 #elif defined _WINDOWS
 #define _STDINT // ~.~
@@ -38,6 +56,7 @@ using google_breakpad::WriteSymbolFile;
 #include <google_breakpad/processor/stack_frame.h>
 #include <processor/pathname_stripper.h>
 
+#include <sstream>
 #include <streambuf>
 
 #include <setjmp.h>
@@ -52,6 +71,21 @@ using google_breakpad::CallStack;
 using google_breakpad::StackFrame;
 using google_breakpad::PathnameStripper;
 using google_breakpad::CodeModule;
+
+class ClogInhibitor
+{
+	std::streambuf *saved_clog = nullptr;
+
+public:
+	ClogInhibitor() {
+		saved_clog = std::clog.rdbuf();
+		std::clog.rdbuf(nullptr);
+	}
+
+	~ClogInhibitor() {
+		std::clog.rdbuf(saved_clog);
+	}
+};
 
 my_jmp_buf envbuf;
 char path[1024];
@@ -123,15 +157,14 @@ int main(int argc, char *argv[])
 			strncpy(path, argv[i], sizeof(path));
 		}
 
+		ProcessState processState;
+		ProcessResult processResult;
 		MinidumpProcessor minidumpProcessor(nullptr, nullptr);
 
-		std::streambuf *old = std::clog.rdbuf();
-		std::clog.rdbuf(nullptr);
-
-		ProcessState processState;
-		ProcessResult processResult = minidumpProcessor.Process(path, &processState);
-
-		std::clog.rdbuf(old);
+		{
+			ClogInhibitor clogInhibitor;
+			processResult = minidumpProcessor.Process(path, &processState);
+		}
 
 		if (processResult != google_breakpad::PROCESS_OK) {
 			continue;
@@ -144,7 +177,6 @@ int main(int argc, char *argv[])
 
 		const CallStack *stack = processState.threads()->at(requestingThread);
 		if (!stack) {
-			fprintf(stderr, "Minidump missing stack!\n");
 			continue;
 		}
 
@@ -153,7 +185,8 @@ int main(int argc, char *argv[])
 			frameCount = 10;
 		}
 
-		printf("1|%d|%s|%x|%d", processState.crashed(), processState.crash_reason().c_str(), (intptr_t)processState.crash_address(), requestingThread);
+		std::ostringstream summaryStream;
+		summaryStream << 1 << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
 
 		std::map<const CodeModule *, unsigned int> moduleMap;
 
@@ -164,22 +197,25 @@ int main(int argc, char *argv[])
 
 			auto debugFile = PathnameStripper::File(module->debug_file());
 			auto debugIdentifier = module->debug_identifier();
-			printf("|M|%s|%s", debugFile.c_str(), debugIdentifier.c_str());
+
+			summaryStream << "|M|" << debugFile << "|" << debugIdentifier;
 		}
 
 		for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
 			const StackFrame *frame = stack->frames()->at(frameIndex);
-			if (frame->module) {
-				auto moduleIndex = moduleMap[frame->module];
-				auto moduleOffset = frame->ReturnAddress() - frame->module->base_address();
 
-				printf("|F|%d|%x", moduleIndex, (intptr_t)moduleOffset);
-			} else {
-				printf("|F|%d|%x", -1, (intptr_t)frame->ReturnAddress());
+			int moduleIndex = -1;
+			auto moduleOffset = frame->ReturnAddress();
+			if (frame->module) {
+				moduleIndex = moduleMap[frame->module];
+				moduleOffset -= frame->module->base_address();
 			}
+
+			summaryStream << "|F|" << moduleIndex << "|" << std::hex << moduleOffset << std::dec;
 		}
 
-		printf("\n");
+		auto summaryLine = summaryStream.str();
+		printf("%s\n", summaryLine.c_str());
 
 #if defined _LINUX
 		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
@@ -197,35 +233,28 @@ int main(int argc, char *argv[])
 				debugFileDir,
 			};
 
-			FILE *saved_stderr = fdopen(dup(fileno(stderr)), "w");
-			if (freopen(_PATH_DEVNULL, "w", stderr)) {
-				// If it fails, not a lot we can (or should) do.
-				// Add this brace section to silence gcc warnings.
-			}
-
 			std::ostringstream outputStream;
 			google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true);
-			if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
-				outputStream.str("");
-				outputStream.clear();
 
-				// Try again without debug dirs.
-				if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
-					// TODO: Something.
+			{
+				StderrInhibitor stdrrInhibitor;
+
+				if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
+					outputStream.str("");
+					outputStream.clear();
+
+					// Try again without debug dirs.
+					if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+						// TODO: Something.
+						continue;
+					}
 				}
 			}
-
-			fflush(stderr);
-			dup2(fileno(saved_stderr), fileno(stderr));
-			fclose(saved_stderr);
-
 
 			// WriteSymbolFileHeaderOnly would do this for us, but this is just for testing.
 			auto output = outputStream.str();
 			output = output.substr(0, output.find("\n"));
-			fprintf(stdout, "%s\n", output.c_str());
-
-			// break;
+			printf("%s\n", output.c_str());
 		}
 #endif
 	}
