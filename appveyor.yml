@@ -11,8 +11,8 @@ install:
   - cd %APPVEYOR_BUILD_FOLDER%
   - '"%VS140COMNTOOLS%\vsvars32.bat"'
   - breakpad.bat
+  - set PATH=%PATH%;%CD%\breakpad\src\src\tools\windows\dump_syms\Release
 build_script:
-  - '"%VS140COMNTOOLS%\vsvars32.bat"'
   - mkdir build
   - cd build
   - C:\python27\python.exe ..\configure.py --enable-optimize

@@ -31,4 +31,7 @@ msbuild src\src\client\windows\crash_generation\crash_generation.sln /m /p:Confi
 cmd /c gyp\gyp.bat --no-circular-check src\src\processor\processor.gyp
 msbuild src\src\processor\processor.sln /m /p:Configuration=Release
 
+cmd /c gyp\gyp.bat --no-circular-check src\src\tools\windows\dump_syms\dump_syms.gyp
+msbuild src\src\tools\windows\dump_syms\dump_syms.sln /m /p:Configuration=Release
+
 cd ..
