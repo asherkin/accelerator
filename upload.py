@@ -21,6 +21,14 @@ def GITHash():
 	return stdout.rstrip('\r\n')
 
 def GITBranch():
+        travis_branch = os.environ.get('TRAVIS_BRANCH', False)
+        if travis_branch:
+            return travis_branch
+
+        appveyor_branch = os.environ.get('APPVEYOR_REPO_BRANCH', False)
+        if appveyor_branch:
+            return appveyor_branch
+
 	p = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 	(stdout, stderr) = p.communicate()
 	stdout = stdout.decode('UTF-8')
