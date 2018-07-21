@@ -226,11 +226,13 @@ int main(int argc, char *argv[])
 				continue;
 			}
 
-			printf("%s\n", debugFile.c_str());
+			// printf("%s\n", debugFile.c_str());
 
 			auto debugFileDir = google_breakpad::DirName(debugFile);
 			std::vector<string> debug_dirs{
 				debugFileDir,
+				debugFileDir + "/.debug",
+				"/usr/lib/debug" + debugFileDir,
 			};
 
 			std::ostringstream outputStream;

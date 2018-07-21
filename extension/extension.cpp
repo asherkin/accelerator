@@ -427,6 +427,74 @@ class UploadThread: public IThread
 		rootconsole->ConsolePrint("Accelerator upload thread terminated. (canceled = %s)", (cancel ? "true" : "false"));
 	}
 
+#if defined _LINUX
+	bool UploadSymbolFile(const google_breakpad::CodeModule *module) {
+		auto debugFile = module->debug_file();
+		if (debugFile[0] != '/') {
+			return false;
+		}
+
+		printf(">>> Submitting %s\n", debugFile.c_str());
+
+		auto debugFileDir = google_breakpad::DirName(debugFile);
+		std::vector<string> debug_dirs{
+			debugFileDir,
+			debugFileDir + "/.debug",
+			"/usr/lib/debug" + debugFileDir,
+		};
+
+		std::ostringstream outputStream;
+		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true);
+
+		{
+			StderrInhibitor stdrrInhibitor;
+
+			if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
+				outputStream.str("");
+				outputStream.clear();
+
+				// Try again without debug dirs.
+				if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+					return false;
+				}
+			}
+		}
+
+		auto output = outputStream.str();
+		// output = output.substr(0, output.find("\n"));
+		// printf(">>> %s\n", output.c_str());
+
+		IWebForm *form = webternet->CreateForm();
+		form->AddString("symbol_file", output.c_str());
+
+		MemoryDownloader data;
+		IWebTransfer *xfer = webternet->CreateSession();
+		xfer->SetFailOnHTTPError(true);
+
+		const char *symbolUrl = g_pSM->GetCoreConfigValue("MinidumpSymbolUrl");
+		if (!symbolUrl) symbolUrl = "http://crash.limetech.org/symbols/submit";
+
+		bool symbolUploaded = xfer->PostAndDownload(symbolUrl, form, &data, NULL);
+
+		if (!symbolUploaded) {
+			printf(">>> Symbol upload failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
+			return false;
+		}
+
+		int responseSize = data.GetSize();
+		char *response = new char[responseSize + 1];
+		strncpy(response, data.GetBuffer(), responseSize + 1);
+		response[responseSize] = '\0';
+		while (responseSize > 0 && response[responseSize - 1] == '\n') {
+			response[--responseSize] = '\0';
+		}
+		printf(">>> Symbol upload complete: %s\n", response);
+		delete[] response;
+
+		return true;
+	}
+#endif
+
 	bool PresubmitCrashDump(const char *path) {
 		google_breakpad::ProcessState processState;
 		google_breakpad::ProcessResult processResult;
@@ -513,6 +581,9 @@ class UploadThread: public IThread
 		char *response = new char[responseSize + 1];
 		strncpy(response, data.GetBuffer(), responseSize + 1);
 		response[responseSize] = '\0';
+		while (responseSize > 0 && response[responseSize - 1] == '\n') {
+			response[--responseSize] = '\0';
+		}
 		printf(">>> Presubmit complete: %s\n", response);
 
 		if (responseSize < 2) {
@@ -536,8 +607,8 @@ class UploadThread: public IThread
 		}
 
 		unsigned int responseCount = responseSize - 2;
-		if (responseCount != moduleCount) {
-			printf(">>> Response module list doesn't match sent list (%d != %d)\n", responseCount, moduleCount);
+		if (responseCount < moduleCount) {
+			printf(">>> Response module list doesn't match sent list (%d < %d)\n", responseCount, moduleCount);
 			delete[] response;
 			return false;
 		}
@@ -550,66 +621,7 @@ class UploadThread: public IThread
 			}
 
 			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
-
-			auto debugFile = module->debug_file();
-			if (debugFile[0] != '/') {
-				continue;
-			}
-
-			printf(">>> Submitting %s\n", debugFile.c_str());
-
-			auto debugFileDir = google_breakpad::DirName(debugFile);
-			std::vector<string> debug_dirs{
-				debugFileDir,
-			};
-
-			std::ostringstream outputStream;
-			google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true);
-
-			{
-				StderrInhibitor stdrrInhibitor;
-
-				if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
-					outputStream.str("");
-					outputStream.clear();
-
-					// Try again without debug dirs.
-					if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
-						// TODO: Something.
-						continue;
-					}
-				}
-			}
-
-			auto output = outputStream.str();
-			// output = output.substr(0, output.find("\n"));
-			// printf(">>> %s\n", output.c_str());
-
-			IWebForm *symbolForm = webternet->CreateForm();
-			symbolForm->AddString("symbol_file", output.c_str());
-
-			MemoryDownloader symbolData;
-			IWebTransfer *symbolXfer = webternet->CreateSession();
-			xfer->SetFailOnHTTPError(true);
-
-			const char *symbolUrl = g_pSM->GetCoreConfigValue("MinidumpSymbolUrl");
-			if (!symbolUrl) symbolUrl = "http://crash.limetech.org/symbols/submit";
-
-			bool symbolUploaded = symbolXfer->PostAndDownload(symbolUrl, symbolForm, &symbolData, NULL);
-
-			if (!symbolUploaded) {
-				printf(">>> Symbol upload failed: %s (%d)\n", symbolXfer->LastErrorMessage(), symbolXfer->LastErrorCode());
-				continue;
-			}
-
-			int symbolResponseSize = symbolData.GetSize();
-			char *symbolResponse = new char[symbolResponseSize + 1];
-			strncpy(symbolResponse, symbolData.GetBuffer(), symbolResponseSize + 1);
-			do {
-				symbolResponse[symbolResponseSize] = '\0';
-			} while (symbolResponse[--symbolResponseSize] == '\n');
-			printf(">>> Symbol upload complete: %s\n", symbolResponse);
-			delete[] symbolResponse;
+			UploadSymbolFile(module);
 		}
 #else
 		printf(">>> Symbol submission not available on this platform\n");
@@ -651,6 +663,9 @@ class UploadThread: public IThread
 				if (responseSize >= maxlen) responseSize = maxlen - 1;
 				strncpy(response, data.GetBuffer(), responseSize);
 				response[responseSize] = '\0';
+				while (responseSize > 0 && response[responseSize - 1] == '\n') {
+					response[--responseSize] = '\0';
+				}
 			} else {
 				g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
 			}
