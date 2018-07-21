@@ -26,16 +26,51 @@
 #include "client/linux/handler/exception_handler.h"
 #include "common/linux/linux_libc_support.h"
 #include "third_party/lss/linux_syscall_support.h"
+#include "common/linux/dump_symbols.h"
+#include "common/path_helper.h"
 
 #include <signal.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <paths.h>
+
+class StderrInhibitor
+{
+	FILE *saved_stderr = nullptr;
+
+public:
+	StderrInhibitor() {
+		saved_stderr = fdopen(dup(fileno(stderr)), "w");
+		if (freopen(_PATH_DEVNULL, "w", stderr)) {
+			// If it fails, not a lot we can (or should) do.
+			// Add this brace section to silence gcc warnings.
+		}
+	}
+
+	~StderrInhibitor() {
+		fflush(stderr);
+		dup2(fileno(saved_stderr), fileno(stderr));
+		fclose(saved_stderr);
+	}
+};
+
 #elif defined _WINDOWS
 #define _STDINT // ~.~
 #include "client/windows/handler/exception_handler.h"
+
 #else
 #error Bad platform.
 #endif
+
+#include <google_breakpad/processor/minidump.h>
+#include <google_breakpad/processor/minidump_processor.h>
+#include <google_breakpad/processor/process_state.h>
+#include <google_breakpad/processor/call_stack.h>
+#include <google_breakpad/processor/stack_frame.h>
+#include <processor/pathname_stripper.h>
+
+#include <sstream>
+#include <streambuf>
 
 Accelerator g_accelerator;
 SMEXT_LINK(&g_accelerator);
@@ -219,6 +254,7 @@ void OnGameFrame(bool simulating)
 		sigaction(kExceptionSignals[i], &act, NULL);
 	}
 }
+
 #elif defined _WINDOWS
 void *vectoredHandler = NULL;
 
@@ -307,56 +343,25 @@ static bool dumpCallback(const wchar_t* dump_path,
 
 	return succeeded;
 }
+
 #else
 #error Bad platform.
 #endif
 
-bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen)
+class ClogInhibitor
 {
-	IWebForm *form = webternet->CreateForm();
+	std::streambuf *saved_clog = nullptr;
 
-	const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
-	if (minidumpAccount) form->AddString("UserID", minidumpAccount);
-
-	form->AddString("GameDirectory", g_pSM->GetGameFolderName());
-	form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
-
-	form->AddFile("upload_file_minidump", path);
-
-	char metapath[512];
-	g_pSM->Format(metapath, sizeof(metapath), "%s.txt", path);
-	if (libsys->PathExists(metapath)) {
-		form->AddFile("upload_file_metadata", metapath);
+public:
+	ClogInhibitor() {
+		saved_clog = std::clog.rdbuf();
+		std::clog.rdbuf(nullptr);
 	}
 
-	MemoryDownloader data;
-	IWebTransfer *xfer = webternet->CreateSession();
-	xfer->SetFailOnHTTPError(true);
-
-	const char *minidumpUrl = g_pSM->GetCoreConfigValue("MinidumpUrl");
-	if (!minidumpUrl) minidumpUrl = "http://crash.limetech.org/submit";
-
-	bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);
-
-	if (response) {
-		if (uploaded) {
-			int responseSize = data.GetSize();
-			if (responseSize >= maxlen) responseSize = maxlen - 1;
-			strncpy(response, data.GetBuffer(), responseSize);
-			response[responseSize] = '\0';
-		} else {
-			g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
-		}
+	~ClogInhibitor() {
+		std::clog.rdbuf(saved_clog);
 	}
-
-	if (libsys->PathExists(metapath)) {
-		unlink(metapath);
-	}
-
-	unlink(path);
-
-	return uploaded;
-}
+};
 
 class UploadThread: public IThread
 {
@@ -390,6 +395,10 @@ class UploadThread: public IThread
 			}
 
 			g_pSM->Format(path, sizeof(path), "%s/%s", dumpStoragePath, name);
+
+			// TODO: Check the return value.
+			bool wantsUpload = PresubmitCrashDump(path);
+
 			bool uploaded = UploadAndDeleteCrashDump(path, response, sizeof(response));
 
 			if (uploaded) {
@@ -418,6 +427,243 @@ class UploadThread: public IThread
 		rootconsole->ConsolePrint("Accelerator upload thread terminated. (canceled = %s)", (cancel ? "true" : "false"));
 	}
 
+	bool PresubmitCrashDump(const char *path) {
+		google_breakpad::ProcessState processState;
+		google_breakpad::ProcessResult processResult;
+		google_breakpad::MinidumpProcessor minidumpProcessor(nullptr, nullptr);
+
+		{
+			ClogInhibitor clogInhibitor;
+			processResult = minidumpProcessor.Process(path, &processState);
+		}
+
+		if (processResult != google_breakpad::PROCESS_OK) {
+			return false;
+		}
+
+		int requestingThread = processState.requesting_thread();
+		if (requestingThread == -1) {
+			requestingThread = 0;
+		}
+
+		const google_breakpad::CallStack *stack = processState.threads()->at(requestingThread);
+		if (!stack) {
+			return false;
+		}
+
+		int frameCount = stack->frames()->size();
+		/*if (frameCount > 10) {
+			frameCount = 10;
+		}*/
+
+		std::ostringstream summaryStream;
+		summaryStream << 1 << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
+
+		std::map<const google_breakpad::CodeModule *, unsigned int> moduleMap;
+
+		unsigned int moduleCount = processState.modules()->module_count();
+		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
+			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
+			moduleMap[module] = moduleIndex;
+
+			auto debugFile = google_breakpad::PathnameStripper::File(module->debug_file());
+			auto debugIdentifier = module->debug_identifier();
+
+			summaryStream << "|M|" << debugFile << "|" << debugIdentifier;
+		}
+
+		for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
+			auto frame = stack->frames()->at(frameIndex);
+
+			int moduleIndex = -1;
+			auto moduleOffset = frame->ReturnAddress();
+			if (frame->module) {
+				moduleIndex = moduleMap[frame->module];
+				moduleOffset -= frame->module->base_address();
+			}
+
+			summaryStream << "|F|" << moduleIndex << "|" << std::hex << moduleOffset << std::dec;
+		}
+
+		auto summaryLine = summaryStream.str();
+		// printf("%s\n", summaryLine.c_str());
+
+		IWebForm *form = webternet->CreateForm();
+
+		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
+		if (minidumpAccount) form->AddString("UserID", minidumpAccount);
+
+		form->AddString("CrashSignature", summaryLine.c_str());
+
+		MemoryDownloader data;
+		IWebTransfer *xfer = webternet->CreateSession();
+		xfer->SetFailOnHTTPError(true);
+
+		const char *minidumpUrl = g_pSM->GetCoreConfigValue("MinidumpUrl");
+		if (!minidumpUrl) minidumpUrl = "http://crash.limetech.org/submit";
+
+		bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);
+
+		if (!uploaded) {
+			printf(">>> Presubmit failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
+			return false;
+		}
+
+		int responseSize = data.GetSize();
+		char *response = new char[responseSize + 1];
+		strncpy(response, data.GetBuffer(), responseSize + 1);
+		response[responseSize] = '\0';
+		printf(">>> Presubmit complete: %s\n", response);
+
+		if (responseSize < 2) {
+			printf(">>> Response too short\n");
+			delete[] response;
+			return false;
+		}
+
+		if (response[0] == 'E') {
+			printf(">>> Presubmit error: %s\n", &response[2]);
+			delete[] response;
+			return false;
+		}
+
+		bool submitCrash = (response[0] == 'Y');
+
+		if (response[1] != '|') {
+			printf(">>> Response delimiter missing\n");
+			delete[] response;
+			return false;
+		}
+
+		unsigned int responseCount = responseSize - 2;
+		if (responseCount != moduleCount) {
+			printf(">>> Response module list doesn't match sent list (%d != %d)\n", responseCount, moduleCount);
+			delete[] response;
+			return false;
+		}
+
+#if defined _LINUX
+		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
+			bool submitModule = (response[2 + moduleIndex] == 'Y');
+			if (!submitModule) {
+				continue;
+			}
+
+			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
+
+			auto debugFile = module->debug_file();
+			if (debugFile[0] != '/') {
+				continue;
+			}
+
+			printf(">>> Submitting %s\n", debugFile.c_str());
+
+			auto debugFileDir = google_breakpad::DirName(debugFile);
+			std::vector<string> debug_dirs{
+				debugFileDir,
+			};
+
+			std::ostringstream outputStream;
+			google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true);
+
+			{
+				StderrInhibitor stdrrInhibitor;
+
+				if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
+					outputStream.str("");
+					outputStream.clear();
+
+					// Try again without debug dirs.
+					if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+						// TODO: Something.
+						continue;
+					}
+				}
+			}
+
+			auto output = outputStream.str();
+			// output = output.substr(0, output.find("\n"));
+			// printf(">>> %s\n", output.c_str());
+
+			IWebForm *symbolForm = webternet->CreateForm();
+			symbolForm->AddString("symbol_file", output.c_str());
+
+			MemoryDownloader symbolData;
+			IWebTransfer *symbolXfer = webternet->CreateSession();
+			xfer->SetFailOnHTTPError(true);
+
+			const char *symbolUrl = g_pSM->GetCoreConfigValue("MinidumpSymbolUrl");
+			if (!symbolUrl) symbolUrl = "http://crash.limetech.org/symbols/submit";
+
+			bool symbolUploaded = symbolXfer->PostAndDownload(symbolUrl, symbolForm, &symbolData, NULL);
+
+			if (!symbolUploaded) {
+				printf(">>> Symbol upload failed: %s (%d)\n", symbolXfer->LastErrorMessage(), symbolXfer->LastErrorCode());
+				continue;
+			}
+
+			int symbolResponseSize = symbolData.GetSize();
+			char *symbolResponse = new char[symbolResponseSize + 1];
+			strncpy(symbolResponse, symbolData.GetBuffer(), symbolResponseSize + 1);
+			do {
+				symbolResponse[symbolResponseSize] = '\0';
+			} while (symbolResponse[--symbolResponseSize] == '\n');
+			printf(">>> Symbol upload complete: %s\n", symbolResponse);
+			delete[] symbolResponse;
+		}
+#else
+		printf(">>> Symbol submission not available on this platform\n");
+#endif
+
+		delete[] response;
+		return submitCrash;
+	}
+
+	bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen) {
+		IWebForm *form = webternet->CreateForm();
+
+		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
+		if (minidumpAccount) form->AddString("UserID", minidumpAccount);
+
+		form->AddString("GameDirectory", g_pSM->GetGameFolderName());
+		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+
+		form->AddFile("upload_file_minidump", path);
+
+		char metapath[512];
+		g_pSM->Format(metapath, sizeof(metapath), "%s.txt", path);
+		if (libsys->PathExists(metapath)) {
+			form->AddFile("upload_file_metadata", metapath);
+		}
+
+		MemoryDownloader data;
+		IWebTransfer *xfer = webternet->CreateSession();
+		xfer->SetFailOnHTTPError(true);
+
+		const char *minidumpUrl = g_pSM->GetCoreConfigValue("MinidumpUrl");
+		if (!minidumpUrl) minidumpUrl = "http://crash.limetech.org/submit";
+
+		bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);
+
+		if (response) {
+			if (uploaded) {
+				int responseSize = data.GetSize();
+				if (responseSize >= maxlen) responseSize = maxlen - 1;
+				strncpy(response, data.GetBuffer(), responseSize);
+				response[responseSize] = '\0';
+			} else {
+				g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
+			}
+		}
+
+		if (libsys->PathExists(metapath)) {
+			unlink(metapath);
+		}
+
+		unlink(path);
+
+		return uploaded;
+	}
 } uploadThread;
 
 class VFuncEmptyClass {};
