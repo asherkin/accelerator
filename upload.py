@@ -4,6 +4,8 @@ import subprocess
 import zipfile
 import ftplib
 
+project = 'accelerator'
+
 platform = 'unknown'
 if sys.platform.startswith('linux'):
 	platform = 'linux'
@@ -42,7 +44,7 @@ def ReleaseVersion():
 	major, minor, release, tag = m.groups()
 	return '.'.join([major, minor, release])
 
-filename = '-'.join(['accelerator', ReleaseVersion(), 'git' + GITVersion(), GITHash(), platform])
+filename = '-'.join([project, ReleaseVersion(), 'git' + GITVersion(), GITHash(), platform])
 
 debug_build = os.environ.get('is_debug_build', False) == "1"
 
@@ -67,16 +69,25 @@ for zinfo in zip.infolist():
 
 zip.close()
 
-if 'ftp_hostname' in os.environ and GITBranch() == 'master':
+if 'ftp_hostname' in os.environ:
 	print('')
 
 	ftp = ftplib.FTP(os.environ['ftp_hostname'], os.environ['ftp_username'], os.environ['ftp_password'])
 	print('Connected to server, uploading build...')
 	ftp.cwd(os.environ['ftp_directory'])
+
+        branch = GITBranch()
+        if branch != 'master':
+            ftp.cwd('branch')
+            branch = project + '-' + branch
+            try:
+                ftp.mkd(branch)
+            except:
+                pass
+            ftp.cwd(branch)
+
 	print(ftp.storbinary('STOR ' + filename, open(filename, 'rb')))
+
 	ftp.quit()
 	
 	print('Uploaded as \'' + filename + '\'')
-
-	os.unlink(filename)
-
