@@ -365,19 +365,23 @@ public:
 
 class UploadThread: public IThread
 {
+	FILE *log = nullptr;
+
 	void RunThread(IThreadHandle *pHandle) {
 		rootconsole->ConsolePrint("Accelerator upload thread started.");
 
-		FILE *log = fopen(logPath, "a");
+		log = fopen(logPath, "a");
 		if (!log) {
 			g_pSM->LogError(myself, "Failed to open Accelerator log file: %s", logPath);
 		}
 
 		IDirectory *dumps = libsys->OpenDirectory(dumpStoragePath);
 
+		int skip = 0;
 		int count = 0;
 		int failed = 0;
 		char path[512];
+		char metapath[512];
 		char response[512];
 
 		while (dumps->MoreFiles()) {
@@ -395,21 +399,37 @@ class UploadThread: public IThread
 			}
 
 			g_pSM->Format(path, sizeof(path), "%s/%s", dumpStoragePath, name);
+			g_pSM->Format(metapath, sizeof(metapath), "%s.txt", path);
 
-			// TODO: Check the return value.
+			if (!libsys->PathExists(metapath)) {
+				metapath[0] = '\0';
+			}
+
 			bool wantsUpload = PresubmitCrashDump(path);
 
-			bool uploaded = UploadAndDeleteCrashDump(path, response, sizeof(response));
+			if (wantsUpload) {
+				bool uploaded = UploadCrashDump(path, metapath, response, sizeof(response));
 
-			if (uploaded) {
-				count++;
-				g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
-				if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
+				if (uploaded) {
+					count++;
+					g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
+					if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
+				} else {
+					failed++;
+					g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
+					if (log) fprintf(log, "Failed to upload crash dump: %s\n", response);
+				}
 			} else {
-				failed++;
-				g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
-                                if (log) fprintf(log, "Failed to upload crash dump: %s\n", response);
+				skip++;
+				g_pSM->LogError(myself, "Accelerator crash dump upload skipped by server");
+				if (log) fprintf(log, "Skipped due to server request\n");
 			}
+
+			if (libsys->PathExists(metapath)) {
+				unlink(metapath);
+			}
+
+			unlink(path);
 
 			dumps->NextEntry();
 		}
@@ -418,9 +438,10 @@ class UploadThread: public IThread
 
 		if (log) {
 			fclose(log);
+			log = nullptr;
 		}
 
-		rootconsole->ConsolePrint("Accelerator upload thread finished. (%d uploaded, %d failed)", count, failed);
+		rootconsole->ConsolePrint("Accelerator upload thread finished. (%d skipped, %d uploaded, %d failed)", skip, count, failed);
 	}
 
 	void OnTerminate(IThreadHandle *pHandle, bool cancel) {
@@ -434,7 +455,7 @@ class UploadThread: public IThread
 			return false;
 		}
 
-		printf(">>> Submitting %s\n", debugFile.c_str());
+		if (log) fprintf(log, "Submitting symbols for %s\n", debugFile.c_str());
 
 		auto debugFileDir = google_breakpad::DirName(debugFile);
 		std::vector<string> debug_dirs{
@@ -455,6 +476,7 @@ class UploadThread: public IThread
 
 				// Try again without debug dirs.
 				if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+					if (log) fprintf(log, "Failed to process symbol file\n");
 					return false;
 				}
 			}
@@ -477,7 +499,7 @@ class UploadThread: public IThread
 		bool symbolUploaded = xfer->PostAndDownload(symbolUrl, form, &data, NULL);
 
 		if (!symbolUploaded) {
-			printf(">>> Symbol upload failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
+			if (log) fprintf(log, "Symbol upload failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
 			return false;
 		}
 
@@ -488,12 +510,159 @@ class UploadThread: public IThread
 		while (responseSize > 0 && response[responseSize - 1] == '\n') {
 			response[--responseSize] = '\0';
 		}
-		printf(">>> Symbol upload complete: %s\n", response);
+		if (log) fprintf(log, "Symbol upload complete: %s\n", response);
 		delete[] response;
 
 		return true;
 	}
 #endif
+
+	bool UploadModuleFile(const google_breakpad::CodeModule *module) {
+		const auto &codeFile = module->code_file();
+
+#ifndef WIN32
+		if (codeFile[0] != '/') {
+#else
+		if (codeFile[1] != ':') {
+#endif
+			return false;
+		}
+
+		if (log) fprintf(log, "Submitting binary for %s\n", codeFile.c_str());
+
+		IWebForm *form = webternet->CreateForm();
+		form->AddString("code_file_path", codeFile.c_str());
+		form->AddString("code_identifier", module->code_identifier().c_str());
+		form->AddString("debug_file_path", module->debug_file().c_str());
+		form->AddString("debug_identifier", module->debug_identifier().c_str());
+		form->AddFile("code_file", codeFile.c_str());
+
+		MemoryDownloader data;
+		IWebTransfer *xfer = webternet->CreateSession();
+		xfer->SetFailOnHTTPError(true);
+
+		const char *binaryUrl = g_pSM->GetCoreConfigValue("MinidumpBinaryUrl");
+		if (!binaryUrl) binaryUrl = "http://crash.limetech.org/binary/submit";
+
+		bool binaryUploaded = xfer->PostAndDownload(binaryUrl, form, &data, NULL);
+
+		if (!binaryUploaded) {
+			if (log) fprintf(log, "Binary upload failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
+			return false;
+		}
+
+		int responseSize = data.GetSize();
+		char *response = new char[responseSize + 1];
+		strncpy(response, data.GetBuffer(), responseSize + 1);
+		response[responseSize] = '\0';
+		while (responseSize > 0 && response[responseSize - 1] == '\n') {
+			response[--responseSize] = '\0';
+		}
+		if (log) fprintf(log, "Binary upload complete: %s\n", response);
+		delete[] response;
+
+		return true;
+	}
+
+	enum ModuleType {
+		kMTUnknown,
+		kMTSystem,
+		kMTGame,
+		kMTAddon,
+		kMTExtension,
+	};
+
+	const char *ModuleTypeCode[5] = {
+		"Unknown",
+		"System",
+		"Game",
+		"Addon",
+		"Extension",
+	};
+
+#ifndef WIN32
+#define PATH_SEP "/"
+#else
+#define PATH_SEP "\\"
+#endif
+
+	bool PathPrefixMatches(const std::string &prefix, const std::string &path) {
+#ifndef WIN32
+		return strncmp(prefix.c_str(), path.c_str(), prefix.length()) == 0;
+#else
+		return _strnicmp(prefix.c_str(), path.c_str(), prefix.length()) == 0;
+#endif
+	}
+
+	struct PathComparator {
+		struct compare {
+			bool operator() (const unsigned char &a, const unsigned char &b) const {
+#ifndef WIN32
+				return a < b;
+#else
+				return tolower(a) < tolower(b);
+#endif
+			}
+		};
+
+		bool operator() (const std::string &a, const std::string &b) const {
+			return !std::lexicographical_compare(
+				a.begin(), a.end(),
+				b.begin(), b.end(),
+				compare());
+		};
+	};
+
+	std::map<std::string, ModuleType, PathComparator> modulePathMap;
+	bool InitModuleClassificationMap(const std::string &base) {
+		if (!modulePathMap.empty()) {
+			return false;
+		}
+
+		modulePathMap[base] = kMTGame;
+		modulePathMap[std::string(crashGamePath) + PATH_SEP "addons" PATH_SEP] = kMTAddon;
+		modulePathMap[std::string(crashSourceModPath) + PATH_SEP "extensions" PATH_SEP] = kMTExtension;
+
+		return true;
+	}
+
+	ModuleType ClassifyModule(const google_breakpad::CodeModule *module) {
+		if (modulePathMap.empty()) {
+			return kMTUnknown;
+		}
+
+		const auto &codeFile = module->code_file();
+
+#ifndef WIN32
+		if (codeFile[0] != '/') {
+#else
+		if (codeFile[1] != ':') {
+#endif
+			return kMTUnknown;
+		}
+
+		for (decltype(modulePathMap)::const_iterator i = modulePathMap.begin(); i != modulePathMap.end(); ++i) {
+			if (PathPrefixMatches(i->first, codeFile)) {
+				return i->second;
+			}
+		}
+
+		return kMTSystem;
+	}
+
+	std::string PathnameStripper_Directory(const std::string &path) {
+		std::string::size_type slash = path.rfind('/');
+		std::string::size_type backslash = path.rfind('\\');
+
+		std::string::size_type file_start = 0;
+		if (slash != std::string::npos && (backslash == std::string::npos || slash > backslash)) {
+			file_start = slash + 1;
+		} else if (backslash != string::npos) {
+			file_start = backslash + 1;
+		}
+
+		return path.substr(0, file_start);
+	}
 
 	bool PresubmitCrashDump(const char *path) {
 		google_breakpad::ProcessState processState;
@@ -520,9 +689,9 @@ class UploadThread: public IThread
 		}
 
 		int frameCount = stack->frames()->size();
-		/*if (frameCount > 10) {
-			frameCount = 10;
-		}*/
+		if (frameCount > 1024) {
+			frameCount = 1024;
+		}
 
 		std::ostringstream summaryStream;
 		summaryStream << 1 << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
@@ -561,6 +730,9 @@ class UploadThread: public IThread
 		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
 		if (minidumpAccount) form->AddString("UserID", minidumpAccount);
 
+		form->AddString("GameDirectory", g_pSM->GetGameFolderName());
+		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+
 		form->AddString("CrashSignature", summaryLine.c_str());
 
 		MemoryDownloader data;
@@ -573,7 +745,7 @@ class UploadThread: public IThread
 		bool uploaded = xfer->PostAndDownload(minidumpUrl, form, &data, NULL);
 
 		if (!uploaded) {
-			printf(">>> Presubmit failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
+			if (log) fprintf(log, "Presubmit failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
 			return false;
 		}
 
@@ -584,16 +756,16 @@ class UploadThread: public IThread
 		while (responseSize > 0 && response[responseSize - 1] == '\n') {
 			response[--responseSize] = '\0';
 		}
-		printf(">>> Presubmit complete: %s\n", response);
+		//if (log) fprintf(log, "Presubmit complete: %s\n", response);
 
 		if (responseSize < 2) {
-			printf(">>> Response too short\n");
+			if (log) fprintf(log, "Presubmit response too short\n");
 			delete[] response;
 			return false;
 		}
 
 		if (response[0] == 'E') {
-			printf(">>> Presubmit error: %s\n", &response[2]);
+			if (log) fprintf(log, "Presubmit error: %s\n", &response[2]);
 			delete[] response;
 			return false;
 		}
@@ -601,37 +773,81 @@ class UploadThread: public IThread
 		bool submitCrash = (response[0] == 'Y');
 
 		if (response[1] != '|') {
-			printf(">>> Response delimiter missing\n");
+			if (log) fprintf(log, "Response delimiter missing\n");
 			delete[] response;
 			return false;
 		}
 
 		unsigned int responseCount = responseSize - 2;
 		if (responseCount < moduleCount) {
-			printf(">>> Response module list doesn't match sent list (%d < %d)\n", responseCount, moduleCount);
+			if (log) fprintf(log, "Response module list doesn't match sent list (%d < %d)\n", responseCount, moduleCount);
 			delete[] response;
 			return false;
 		}
 
-#if defined _LINUX
+		auto mainModule = processState.modules()->GetMainModule();
+		auto executableBaseDir = PathnameStripper_Directory(mainModule->code_file());
+		InitModuleClassificationMap(executableBaseDir);
+
+		// 0 = Disabled
+		// 1 = System Only
+		// 2 = System + Game
+		// 3 = System + Game + Addons
+		const char *symbolSubmitOptionStr = g_pSM->GetCoreConfigValue("MinidumpSymbolUpload");
+		int symbolSubmitOption = symbolSubmitOptionStr ? atoi(symbolSubmitOptionStr) : 3;
+
+		const char *binarySubmitOption = g_pSM->GetCoreConfigValue("MinidumpBinaryUpload");
+		bool canBinarySubmit = !binarySubmitOption || (tolower(binarySubmitOption[0]) == 'y' || binarySubmitOption[0] == '1');
+
 		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
-			bool submitModule = (response[2 + moduleIndex] == 'Y');
-			if (!submitModule) {
+			bool submitSymbols = (response[2 + moduleIndex] == 'Y');
+			bool submitBinary = (response[2 + moduleIndex] == 'U');
+			if (!submitSymbols && !submitBinary) {
 				continue;
 			}
 
 			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
-			UploadSymbolFile(module);
-		}
-#else
-		printf(">>> Symbol submission not available on this platform\n");
+
+			auto moduleType = ClassifyModule(module);
+			if (log) fprintf(log, "Classified module %s as %s\n", module->code_file().c_str(), ModuleTypeCode[moduleType]);
+
+			switch (moduleType) {
+				case kMTUnknown:
+					continue;
+				case kMTSystem:
+					if (symbolSubmitOption < 1) {
+						continue;
+					}
+					break;
+				case kMTGame:
+					if (symbolSubmitOption < 2) {
+						continue;
+					}
+					break;
+				case kMTAddon:
+				case kMTExtension:
+					if (symbolSubmitOption < 3) {
+						continue;
+					}
+					break;
+			}
+
+			if (canBinarySubmit && submitBinary) {
+				UploadModuleFile(module);
+			}
+
+#if defined _LINUX
+			if (submitSymbols) {
+				UploadSymbolFile(module);
+			}
 #endif
+		}
 
 		delete[] response;
 		return submitCrash;
 	}
 
-	bool UploadAndDeleteCrashDump(const char *path, char *response, int maxlen) {
+	bool UploadCrashDump(const char *path, const char *metapath, char *response, int maxlen) {
 		IWebForm *form = webternet->CreateForm();
 
 		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
@@ -642,9 +858,7 @@ class UploadThread: public IThread
 
 		form->AddFile("upload_file_minidump", path);
 
-		char metapath[512];
-		g_pSM->Format(metapath, sizeof(metapath), "%s.txt", path);
-		if (libsys->PathExists(metapath)) {
+		if (metapath[0]) {
 			form->AddFile("upload_file_metadata", metapath);
 		}
 
@@ -670,12 +884,6 @@ class UploadThread: public IThread
 				g_pSM->Format(response, maxlen, "%s (%d)", xfer->LastErrorMessage(), xfer->LastErrorCode());
 			}
 		}
-
-		if (libsys->PathExists(metapath)) {
-			unlink(metapath);
-		}
-
-		unlink(path);
 
 		return uploaded;
 	}
@@ -736,6 +944,11 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	}
 
 	g_pSM->BuildPath(Path_SM, logPath, sizeof(logPath), "logs/accelerator.log");
+
+	// Get these early so the upload thread can use them.
+	strncpy(crashGamePath, g_pSM->GetGamePath(), sizeof(crashGamePath) - 1);
+	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
+	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 
 	threader->MakeThread(&uploadThread);
 
@@ -821,10 +1034,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	delete i;
 #endif
 
-	strncpy(crashGamePath, g_pSM->GetGamePath(), sizeof(crashGamePath) - 1);
 	strncpy(crashCommandLine, GetCmdLine(), sizeof(crashCommandLine) - 1);
-	strncpy(crashSourceModPath, g_pSM->GetSourceModPath(), sizeof(crashSourceModPath) - 1);
-	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 
 	char steamInfPath[512];
 	g_pSM->BuildPath(Path_Game, steamInfPath, sizeof(steamInfPath), "steam.inf");
