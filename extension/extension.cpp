@@ -382,6 +382,7 @@ class UploadThread: public IThread
 		int failed = 0;
 		char path[512];
 		char metapath[512];
+		char presubmitToken[512];
 		char response[512];
 
 		while (dumps->MoreFiles()) {
@@ -405,31 +406,42 @@ class UploadThread: public IThread
 				metapath[0] = '\0';
 			}
 
-			bool wantsUpload = PresubmitCrashDump(path);
+			presubmitToken[0] = '\0';
+			PresubmitResponse presubmitResponse = PresubmitCrashDump(path, presubmitToken, sizeof(presubmitToken));
 
-			if (wantsUpload) {
-				bool uploaded = UploadCrashDump(path, metapath, response, sizeof(response));
-
-				if (uploaded) {
-					count++;
-					g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
-					if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
-				} else {
+			switch (presubmitResponse) {
+				case kPRLocalError:
 					failed++;
-					g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
-					if (log) fprintf(log, "Failed to upload crash dump: %s\n", response);
-				}
-			} else {
-				skip++;
-				g_pSM->LogError(myself, "Accelerator crash dump upload skipped by server");
-				if (log) fprintf(log, "Skipped due to server request\n");
+					g_pSM->LogError(myself, "Accelerator failed to locally process crash dump");
+					if (log) fprintf(log, "Failed to locally process crash dump");
+					break;
+				case kPRRemoteError:
+				case kPRUploadCrashDumpAndMetadata:
+				case kPRUploadMetadataOnly:
+					if (UploadCrashDump((presubmitResponse == kPRUploadMetadataOnly) ? nullptr : path, metapath, presubmitToken, response, sizeof(response))) {
+						count++;
+						g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
+						if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
+					} else {
+						failed++;
+						g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
+						if (log) fprintf(log, "Failed to upload crash dump: %s\n", response);
+					}
+					break;
+				case kPRDontUpload:
+					skip++;
+					g_pSM->LogError(myself, "Accelerator crash dump upload skipped by server");
+					if (log) fprintf(log, "Skipped due to server request\n");
+					break;
 			}
 
-			if (libsys->PathExists(metapath)) {
+			if (metapath[0]) {
 				unlink(metapath);
 			}
 
 			unlink(path);
+
+			if (log) fflush(log);
 
 			dumps->NextEntry();
 		}
@@ -449,7 +461,7 @@ class UploadThread: public IThread
 	}
 
 #if defined _LINUX
-	bool UploadSymbolFile(const google_breakpad::CodeModule *module) {
+	bool UploadSymbolFile(const google_breakpad::CodeModule *module, const char *presubmitToken) {
 		auto debugFile = module->debug_file();
 		if (debugFile[0] != '/') {
 			return false;
@@ -487,6 +499,16 @@ class UploadThread: public IThread
 		// printf(">>> %s\n", output.c_str());
 
 		IWebForm *form = webternet->CreateForm();
+
+		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
+		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
+
+		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+
+		if (presubmitToken && presubmitToken[0]) {
+			form->AddString("PresubmitToken", presubmitToken);
+		}
+		
 		form->AddString("symbol_file", output.c_str());
 
 		MemoryDownloader data;
@@ -517,7 +539,7 @@ class UploadThread: public IThread
 	}
 #endif
 
-	bool UploadModuleFile(const google_breakpad::CodeModule *module) {
+	bool UploadModuleFile(const google_breakpad::CodeModule *module, const char *presubmitToken) {
 		const auto &codeFile = module->code_file();
 
 #ifndef WIN32
@@ -531,10 +553,19 @@ class UploadThread: public IThread
 		if (log) fprintf(log, "Submitting binary for %s\n", codeFile.c_str());
 
 		IWebForm *form = webternet->CreateForm();
-		form->AddString("code_file_path", codeFile.c_str());
-		form->AddString("code_identifier", module->code_identifier().c_str());
-		form->AddString("debug_file_path", module->debug_file().c_str());
+
+		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
+		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
+
+		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+
+		if (presubmitToken && presubmitToken[0]) {
+			form->AddString("PresubmitToken", presubmitToken);
+		}
+
 		form->AddString("debug_identifier", module->debug_identifier().c_str());
+		form->AddString("code_identifier", module->code_identifier().c_str());
+
 		form->AddFile("code_file", codeFile.c_str());
 
 		MemoryDownloader data;
@@ -616,7 +647,7 @@ class UploadThread: public IThread
 	std::map<std::string, ModuleType, PathComparator> modulePathMap;
 	bool InitModuleClassificationMap(const std::string &base) {
 		if (!modulePathMap.empty()) {
-			return false;
+			modulePathMap.clear();
 		}
 
 		modulePathMap[base] = kMTGame;
@@ -664,7 +695,15 @@ class UploadThread: public IThread
 		return path.substr(0, file_start);
 	}
 
-	bool PresubmitCrashDump(const char *path) {
+	enum PresubmitResponse {
+		kPRLocalError,
+		kPRRemoteError,
+		kPRDontUpload,
+		kPRUploadCrashDumpAndMetadata,
+		kPRUploadMetadataOnly,
+	};
+
+	PresubmitResponse PresubmitCrashDump(const char *path, char *tokenBuffer, size_t tokenBufferLength) {
 		google_breakpad::ProcessState processState;
 		google_breakpad::ProcessResult processResult;
 		google_breakpad::MinidumpProcessor minidumpProcessor(nullptr, nullptr);
@@ -675,7 +714,7 @@ class UploadThread: public IThread
 		}
 
 		if (processResult != google_breakpad::PROCESS_OK) {
-			return false;
+			return kPRLocalError;
 		}
 
 		int requestingThread = processState.requesting_thread();
@@ -685,7 +724,7 @@ class UploadThread: public IThread
 
 		const google_breakpad::CallStack *stack = processState.threads()->at(requestingThread);
 		if (!stack) {
-			return false;
+			return kPRLocalError;
 		}
 
 		int frameCount = stack->frames()->size();
@@ -728,9 +767,8 @@ class UploadThread: public IThread
 		IWebForm *form = webternet->CreateForm();
 
 		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
-		if (minidumpAccount) form->AddString("UserID", minidumpAccount);
+		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
 
-		form->AddString("GameDirectory", g_pSM->GetGameFolderName());
 		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
 
 		form->AddString("CrashSignature", summaryLine.c_str());
@@ -746,7 +784,7 @@ class UploadThread: public IThread
 
 		if (!uploaded) {
 			if (log) fprintf(log, "Presubmit failed: %s (%d)\n", xfer->LastErrorMessage(), xfer->LastErrorCode());
-			return false;
+			return kPRRemoteError;
 		}
 
 		int responseSize = data.GetSize();
@@ -761,28 +799,49 @@ class UploadThread: public IThread
 		if (responseSize < 2) {
 			if (log) fprintf(log, "Presubmit response too short\n");
 			delete[] response;
-			return false;
+			return kPRRemoteError;
 		}
 
 		if (response[0] == 'E') {
 			if (log) fprintf(log, "Presubmit error: %s\n", &response[2]);
 			delete[] response;
-			return false;
+			return kPRRemoteError;
 		}
 
-		bool submitCrash = (response[0] == 'Y');
+		PresubmitResponse presubmitResponse = kPRRemoteError;
+		if (response[0] == 'Y') presubmitResponse = kPRUploadCrashDumpAndMetadata;
+		else if (response[0] == 'N') presubmitResponse = kPRDontUpload;
+		else if (response[0] == 'M') presubmitResponse = kPRUploadMetadataOnly;
+		else return kPRRemoteError;
 
 		if (response[1] != '|') {
 			if (log) fprintf(log, "Response delimiter missing\n");
 			delete[] response;
-			return false;
+			return kPRRemoteError;
 		}
 
 		unsigned int responseCount = responseSize - 2;
 		if (responseCount < moduleCount) {
 			if (log) fprintf(log, "Response module list doesn't match sent list (%d < %d)\n", responseCount, moduleCount);
 			delete[] response;
-			return false;
+			return presubmitResponse;
+		}
+
+		// There was a presubmit token included.
+		if (tokenBuffer && responseCount > moduleCount && response[2 + moduleCount] == '|') {
+			int tokenStart = 2 + moduleCount + 1;
+			int tokenEnd = tokenStart;
+			while (tokenEnd < responseSize && response[tokenEnd] != '|') {
+				tokenEnd++;
+			}
+
+			size_t tokenLength = tokenEnd - tokenStart;
+			if (tokenLength < tokenBufferLength) {
+				strncpy(tokenBuffer, &response[tokenStart], tokenLength);
+				tokenBuffer[tokenLength] = '\0';
+			}
+
+			if (log) fprintf(log, "Got a presubmit token from server: %s\n", tokenBuffer);
 		}
 
 		auto mainModule = processState.modules()->GetMainModule();
@@ -800,8 +859,13 @@ class UploadThread: public IThread
 		bool canBinarySubmit = !binarySubmitOption || (tolower(binarySubmitOption[0]) == 'y' || binarySubmitOption[0] == '1');
 
 		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
-			bool submitSymbols = (response[2 + moduleIndex] == 'Y');
+			bool submitSymbols = false;
 			bool submitBinary = (response[2 + moduleIndex] == 'U');
+
+#if defined _LINUX
+			submitSymbols = (response[2 + moduleIndex] == 'Y');
+#endif
+
 			if (!submitSymbols && !submitBinary) {
 				continue;
 			}
@@ -833,32 +897,38 @@ class UploadThread: public IThread
 			}
 
 			if (canBinarySubmit && submitBinary) {
-				UploadModuleFile(module);
+				UploadModuleFile(module, tokenBuffer);
 			}
 
 #if defined _LINUX
 			if (submitSymbols) {
-				UploadSymbolFile(module);
+				UploadSymbolFile(module, tokenBuffer);
 			}
 #endif
 		}
 
 		delete[] response;
-		return submitCrash;
+		return presubmitResponse;
 	}
 
-	bool UploadCrashDump(const char *path, const char *metapath, char *response, int maxlen) {
+	bool UploadCrashDump(const char *path, const char *metapath, const char *presubmitToken, char *response, int maxlen) {
 		IWebForm *form = webternet->CreateForm();
 
 		const char *minidumpAccount = g_pSM->GetCoreConfigValue("MinidumpAccount");
-		if (minidumpAccount) form->AddString("UserID", minidumpAccount);
+		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
 
-		form->AddString("GameDirectory", g_pSM->GetGameFolderName());
+		form->AddString("GameDirectory", crashGameDirectory);
 		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
 
-		form->AddFile("upload_file_minidump", path);
+		if (presubmitToken && presubmitToken[0]) {
+			form->AddString("PresubmitToken", presubmitToken);
+		}
 
-		if (metapath[0]) {
+		if (path && path[0]) {
+			form->AddFile("upload_file_minidump", path);
+		}
+
+		if (metapath && metapath[0]) {
 			form->AddFile("upload_file_metadata", metapath);
 		}
 
