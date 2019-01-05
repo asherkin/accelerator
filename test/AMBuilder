@@ -28,28 +28,28 @@ def BuildEverything():
 	extension = AMBuild.AddJob(name)
 	binary = Cpp.ExecutableBuilder(name, AMBuild, extension, compiler)
 
-        sourceFiles = [
-            'test.cpp',
-        ]
+	sourceFiles = [
+		'test.cpp',
+	]
 
-        if AMBuild.target['platform'] in ['linux']:
-            sourceFiles.extend([
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_cfi_to_module.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_cu_to_module.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_line_to_module.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'language.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'module.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'path_helper.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'stabs_reader.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'stabs_to_module.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'bytereader.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'dwarf2diehandler.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'dwarf2reader.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'elf_reader.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'crc32.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'dump_symbols.cc'),
-                os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'elf_symbols_to_module.cc'),
-            ])
+	if AMBuild.target['platform'] in ['linux']:
+		sourceFiles.extend([
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_cfi_to_module.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_cu_to_module.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf_line_to_module.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'language.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'module.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'path_helper.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'stabs_reader.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'stabs_to_module.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'bytereader.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'dwarf2diehandler.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'dwarf2reader.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'dwarf', 'elf_reader.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'crc32.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'dump_symbols.cc'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'common', 'linux', 'elf_symbols_to_module.cc'),
+		])
 
 	binary.AddSourceFiles('test', sourceFiles);
 
@@ -71,11 +71,11 @@ def BuildEverything():
 
 	elif AMBuild.target['platform'] in ['windows']:
 		libs = [
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'libdisasm.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'libdisasm.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
 		]
 
 		for path in libs:

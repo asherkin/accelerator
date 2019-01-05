@@ -38,24 +38,24 @@ def BuildEverything():
 
 	binary.AddSourceFiles(AMBuild.cache['SOURCEMOD'], ['public/smsdk_ext.cpp'])
 
-        if AMBuild.target['platform'] in ['linux']:
-            binary.AddSourceFiles(os.path.join('breakpad', 'src', 'src', 'common'), [
-                'dwarf_cfi_to_module.cc',
-                'dwarf_cu_to_module.cc',
-                'dwarf_line_to_module.cc',
-                'language.cc',
-                'module.cc',
-                'path_helper.cc',
-                'stabs_reader.cc',
-                'stabs_to_module.cc',
-                'dwarf/bytereader.cc',
-                'dwarf/dwarf2diehandler.cc',
-                'dwarf/dwarf2reader.cc',
-                'dwarf/elf_reader.cc',
-                'linux/crc32.cc',
-                'linux/dump_symbols.cc',
-                'linux/elf_symbols_to_module.cc',
-            ])
+	if AMBuild.target['platform'] in ['linux']:
+		binary.AddSourceFiles(os.path.join('breakpad', 'src', 'src', 'common'), [
+			'dwarf_cfi_to_module.cc',
+			'dwarf_cu_to_module.cc',
+			'dwarf_line_to_module.cc',
+			'language.cc',
+			'module.cc',
+			'path_helper.cc',
+			'stabs_reader.cc',
+			'stabs_to_module.cc',
+			'dwarf/bytereader.cc',
+			'dwarf/dwarf2diehandler.cc',
+			'dwarf/dwarf2reader.cc',
+			'dwarf/elf_reader.cc',
+			'linux/crc32.cc',
+			'linux/dump_symbols.cc',
+			'linux/elf_symbols_to_module.cc',
+		])
 
 	if AMBuild.target['platform'] in ['linux']:
 		libs = [
@@ -75,11 +75,11 @@ def BuildEverything():
 
 	elif AMBuild.target['platform'] in ['windows']:
 		libs = [
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'libdisasm.lib'),
-		    os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'libdisasm.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
 		]
 
 		for path in libs:
