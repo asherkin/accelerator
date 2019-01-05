@@ -43,6 +43,7 @@ def BuildEverything():
 			'dwarf_cfi_to_module.cc',
 			'dwarf_cu_to_module.cc',
 			'dwarf_line_to_module.cc',
+			'dwarf_range_list_handler.cc',
 			'language.cc',
 			'module.cc',
 			'path_helper.cc',
@@ -78,7 +79,7 @@ def BuildEverything():
 			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
 			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
 			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
-			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'libdisasm.lib'),
+			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'third_party', 'libdisasm', 'Release', 'lib', 'libdisasm.lib'),
 			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
 		]
 
