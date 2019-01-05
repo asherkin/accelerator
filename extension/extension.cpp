@@ -71,6 +71,7 @@ public:
 
 #include <sstream>
 #include <streambuf>
+#include <random>
 
 Accelerator g_accelerator;
 SMEXT_LINK(&g_accelerator);
@@ -366,6 +367,7 @@ public:
 class UploadThread: public IThread
 {
 	FILE *log = nullptr;
+	char serverId[38] = "";
 
 	void RunThread(IThreadHandle *pHandle) {
 		rootconsole->ConsolePrint("Accelerator upload thread started.");
@@ -375,12 +377,34 @@ class UploadThread: public IThread
 			g_pSM->LogError(myself, "Failed to open Accelerator log file: %s", logPath);
 		}
 
+		char path[512];
+		g_pSM->Format(path, sizeof(path), "%s/server-id.txt", dumpStoragePath);
+		FILE *serverIdFile = fopen(path, "r");
+		if (serverIdFile) {
+			fread(serverId, 1, sizeof(serverId) - 1, serverIdFile);
+			if (!feof(serverIdFile) || strlen(serverId) != 36) {
+				serverId[0] = '\0';
+			}
+			fclose(serverIdFile);
+		}
+		if (!serverId[0]) {
+			serverIdFile = fopen(path, "w");
+			if (serverIdFile) {
+				std::random_device rd;
+				std::uniform_int_distribution<int> dist(0, 255);
+				g_pSM->Format(serverId, sizeof(serverId), "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+					dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), 0x40 | (dist(rd) & 0x0F), dist(rd),
+					0x80 | (dist(rd) & 0x3F), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd));
+				fputs(serverId, serverIdFile);
+				fclose(serverIdFile);
+			}
+		}
+
 		IDirectory *dumps = libsys->OpenDirectory(dumpStoragePath);
 
 		int skip = 0;
 		int count = 0;
 		int failed = 0;
-		char path[512];
 		char metapath[512];
 		char presubmitToken[512];
 		char response[512];
@@ -504,6 +528,7 @@ class UploadThread: public IThread
 		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
 
 		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+		form->AddString("ServerID", serverId);
 
 		if (presubmitToken && presubmitToken[0]) {
 			form->AddString("PresubmitToken", presubmitToken);
@@ -558,6 +583,7 @@ class UploadThread: public IThread
 		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
 
 		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+		form->AddString("ServerID", serverId);
 
 		if (presubmitToken && presubmitToken[0]) {
 			form->AddString("PresubmitToken", presubmitToken);
@@ -770,6 +796,7 @@ class UploadThread: public IThread
 		if (minidumpAccount && minidumpAccount[0]) form->AddString("UserID", minidumpAccount);
 
 		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+		form->AddString("ServerID", serverId);
 
 		form->AddString("CrashSignature", summaryLine.c_str());
 
@@ -919,6 +946,7 @@ class UploadThread: public IThread
 
 		form->AddString("GameDirectory", crashGameDirectory);
 		form->AddString("ExtensionVersion", SMEXT_CONF_VERSION);
+		form->AddString("ServerID", serverId);
 
 		if (presubmitToken && presubmitToken[0]) {
 			form->AddString("PresubmitToken", presubmitToken);
