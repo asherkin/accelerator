@@ -2,7 +2,11 @@ import re, os, sys
 import subprocess
 
 import zipfile
-import ftplib
+import base64
+try:
+	import urllib.request as urllib
+except ImportError:
+	import urllib2 as urllib
 
 project = 'accelerator'
 
@@ -21,13 +25,13 @@ def GITHash():
 	return stdout.rstrip('\r\n')
 
 def GITBranch():
-        travis_branch = os.environ.get('TRAVIS_BRANCH', False)
-        if travis_branch:
-            return travis_branch
+	travis_branch = os.environ.get('TRAVIS_BRANCH', False)
+	if travis_branch:
+		return travis_branch
 
-        appveyor_branch = os.environ.get('APPVEYOR_REPO_BRANCH', False)
-        if appveyor_branch:
-            return appveyor_branch
+	appveyor_branch = os.environ.get('APPVEYOR_REPO_BRANCH', False)
+	if appveyor_branch:
+		return appveyor_branch
 
 	p = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 	(stdout, stderr) = p.communicate()
@@ -77,25 +81,14 @@ for zinfo in zip.infolist():
 
 zip.close()
 
-if 'ftp_hostname' in os.environ:
+if 'ftp_username' in os.environ:
 	print('')
 
-	ftp = ftplib.FTP(os.environ['ftp_hostname'], os.environ['ftp_username'], os.environ['ftp_password'])
-	print('Connected to server, uploading build...')
-	ftp.cwd(os.environ['ftp_directory'])
-
-        branch = GITBranch()
-        if branch != 'master':
-            ftp.cwd('branch')
-            branch = project + '-' + branch
-            try:
-                ftp.mkd(branch)
-            except:
-                pass
-            ftp.cwd(branch)
-
-	print(ftp.storbinary('STOR ' + filename, open(filename, 'rb')))
-
-	ftp.quit()
+	request = urllib.Request("https://builds.limetech.io/upload.php?project=%s&branch=%s&filename=%s" % (project, GITBranch(), filename), open(filename, 'rb'), headers={
+		'Authorization': "Basic %s" % (base64.encodestring(("%s:%s" % (os.environ['ftp_username'], os.environ['ftp_password'])).encode()).decode()[:-1]),
+		'Content-Type': 'application/zip',
+    	'Content-Length': os.stat(filename).st_size,
+	})
+	print(urllib.urlopen(request).read().decode('utf-8'))
 	
 	print('Uploaded as \'' + filename + '\'')
