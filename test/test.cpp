@@ -175,6 +175,21 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
+		// Minidumps missing a module list are basically useless
+		if (!processState.modules()) {
+			continue;
+		}
+
+		std::string os_short = "";
+		std::string cpu_arch = "";
+		if (processState.system_info()) {
+			os_short = processState.system_info()->os_short;
+			if (os_short.empty()) {
+				os_short = processState.system_info()->os;
+			}
+			cpu_arch = processState.system_info()->cpu;
+		}
+
 		int requestingThread = processState.requesting_thread();
 		if (requestingThread == -1) {
 			requestingThread = 0;
@@ -191,7 +206,7 @@ int main(int argc, char *argv[])
 		}
 
 		std::ostringstream summaryStream;
-		summaryStream << 2 << "|" << processState.time_date_stamp() << "|" << processState.system_info()->os_short << "|" << processState.system_info()->cpu << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
+		summaryStream << 2 << "|" << processState.time_date_stamp() << "|" << os_short << "|" << cpu_arch << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
 
 		std::map<const CodeModule *, unsigned int> moduleMap;
 
