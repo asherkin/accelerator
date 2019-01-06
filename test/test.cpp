@@ -128,8 +128,13 @@ static bool dumpCallback(const wchar_t *dump_path, const wchar_t *minidump_id, v
 
 int main(int argc, char *argv[])
 {
+	bool shouldDumpSymbols = false;
+	if (argc > 1 && strcmp(argv[1], "-d") == 0) {
+		shouldDumpSymbols = true;
+	}
+
 	bool generateCrash = false;
-	if (argc <= 1) {
+	if (argc <= (shouldDumpSymbols ? 2 : 1)) {
 		generateCrash = true;
 
 		if (my_setjmp(envbuf) == 0) {
@@ -149,10 +154,10 @@ int main(int argc, char *argv[])
 
 		printf("Returned from signal handler, path: %s\n", path);
 
-		argc = 2;
+		argc = (shouldDumpSymbols ? 3 : 2);
 	}
 
-	for (int i = 1; i < argc; ++i) {
+	for (int i = (shouldDumpSymbols ? 2 : 1); i < argc; ++i) {
 		if (!generateCrash) {
 			strncpy(path, argv[i], sizeof(path));
 		}
@@ -181,12 +186,12 @@ int main(int argc, char *argv[])
 		}
 
 		int frameCount = stack->frames()->size();
-		if (frameCount > 10) {
-			frameCount = 10;
+		if (frameCount > 1024) {
+			frameCount = 1024;
 		}
 
 		std::ostringstream summaryStream;
-		summaryStream << 1 << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
+		summaryStream << 2 << "|" << processState.time_date_stamp() << "|" << processState.system_info()->os_short << "|" << processState.system_info()->cpu << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
 
 		std::map<const CodeModule *, unsigned int> moduleMap;
 
@@ -218,7 +223,7 @@ int main(int argc, char *argv[])
 		printf("%s\n", summaryLine.c_str());
 
 #if defined _LINUX
-		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
+		for (unsigned int moduleIndex = 0; shouldDumpSymbols && moduleIndex < moduleCount; ++moduleIndex) {
 			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
 
 			auto debugFile = module->debug_file();

@@ -759,7 +759,7 @@ class UploadThread: public IThread
 		}
 
 		std::ostringstream summaryStream;
-		summaryStream << 1 << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
+		summaryStream << 2 << "|" << processState.time_date_stamp() << "|" << processState.system_info()->os_short << "|" << processState.system_info()->cpu << "|" << processState.crashed() << "|" << processState.crash_reason() << "|" << std::hex << processState.crash_address() << std::dec << "|" << requestingThread;
 
 		std::map<const google_breakpad::CodeModule *, unsigned int> moduleMap;
 
