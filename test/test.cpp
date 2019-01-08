@@ -175,11 +175,6 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
-		// Minidumps missing a module list are basically useless
-		if (!processState.modules()) {
-			continue;
-		}
-
 		std::string os_short = "";
 		std::string cpu_arch = "";
 		if (processState.system_info()) {
@@ -210,7 +205,7 @@ int main(int argc, char *argv[])
 
 		std::map<const CodeModule *, unsigned int> moduleMap;
 
-		unsigned int moduleCount = processState.modules()->module_count();
+		unsigned int moduleCount = processState.modules() ? processState.modules()->module_count() : 0;
 		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
 			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
 			moduleMap[module] = moduleIndex;

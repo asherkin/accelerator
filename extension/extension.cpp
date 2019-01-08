@@ -743,11 +743,6 @@ class UploadThread: public IThread
 			return kPRLocalError;
 		}
 
-		// Minidumps missing a module list are basically useless
-		if (!processState.modules()) {
-			return kPRLocalError;
-		}
-
 		std::string os_short = "";
 		std::string cpu_arch = "";
 		if (processState.system_info()) {
@@ -778,7 +773,7 @@ class UploadThread: public IThread
 
 		std::map<const google_breakpad::CodeModule *, unsigned int> moduleMap;
 
-		unsigned int moduleCount = processState.modules()->module_count();
+		unsigned int moduleCount = processState.modules() ? processState.modules()->module_count() : 0;
 		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
 			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
 			moduleMap[module] = moduleIndex;
@@ -886,67 +881,69 @@ class UploadThread: public IThread
 			if (log) fprintf(log, "Got a presubmit token from server: %s\n", tokenBuffer);
 		}
 
-		auto mainModule = processState.modules()->GetMainModule();
-		auto executableBaseDir = PathnameStripper_Directory(mainModule->code_file());
-		InitModuleClassificationMap(executableBaseDir);
+		if (moduleCount > 0) {
+			auto mainModule = processState.modules()->GetMainModule();
+			auto executableBaseDir = PathnameStripper_Directory(mainModule->code_file());
+			InitModuleClassificationMap(executableBaseDir);
 
-		// 0 = Disabled
-		// 1 = System Only
-		// 2 = System + Game
-		// 3 = System + Game + Addons
-		const char *symbolSubmitOptionStr = g_pSM->GetCoreConfigValue("MinidumpSymbolUpload");
-		int symbolSubmitOption = symbolSubmitOptionStr ? atoi(symbolSubmitOptionStr) : 3;
+			// 0 = Disabled
+			// 1 = System Only
+			// 2 = System + Game
+			// 3 = System + Game + Addons
+			const char *symbolSubmitOptionStr = g_pSM->GetCoreConfigValue("MinidumpSymbolUpload");
+			int symbolSubmitOption = symbolSubmitOptionStr ? atoi(symbolSubmitOptionStr) : 3;
 
-		const char *binarySubmitOption = g_pSM->GetCoreConfigValue("MinidumpBinaryUpload");
-		bool canBinarySubmit = !binarySubmitOption || (tolower(binarySubmitOption[0]) == 'y' || binarySubmitOption[0] == '1');
+			const char *binarySubmitOption = g_pSM->GetCoreConfigValue("MinidumpBinaryUpload");
+			bool canBinarySubmit = !binarySubmitOption || (tolower(binarySubmitOption[0]) == 'y' || binarySubmitOption[0] == '1');
 
-		for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
-			bool submitSymbols = false;
-			bool submitBinary = (response[2 + moduleIndex] == 'U');
+			for (unsigned int moduleIndex = 0; moduleIndex < moduleCount; ++moduleIndex) {
+				bool submitSymbols = false;
+				bool submitBinary = (response[2 + moduleIndex] == 'U');
 
 #if defined _LINUX
-			submitSymbols = (response[2 + moduleIndex] == 'Y');
+				submitSymbols = (response[2 + moduleIndex] == 'Y');
 #endif
 
-			if (!submitSymbols && !submitBinary) {
-				continue;
-			}
-
-			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
-
-			auto moduleType = ClassifyModule(module);
-			if (log) fprintf(log, "Classified module %s as %s\n", module->code_file().c_str(), ModuleTypeCode[moduleType]);
-
-			switch (moduleType) {
-				case kMTUnknown:
+				if (!submitSymbols && !submitBinary) {
 					continue;
-				case kMTSystem:
-					if (symbolSubmitOption < 1) {
-						continue;
-					}
-					break;
-				case kMTGame:
-					if (symbolSubmitOption < 2) {
-						continue;
-					}
-					break;
-				case kMTAddon:
-				case kMTExtension:
-					if (symbolSubmitOption < 3) {
-						continue;
-					}
-					break;
-			}
+				}
 
-			if (canBinarySubmit && submitBinary) {
-				UploadModuleFile(module, tokenBuffer);
-			}
+				auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
+
+				auto moduleType = ClassifyModule(module);
+				if (log) fprintf(log, "Classified module %s as %s\n", module->code_file().c_str(), ModuleTypeCode[moduleType]);
+
+				switch (moduleType) {
+					case kMTUnknown:
+						continue;
+					case kMTSystem:
+						if (symbolSubmitOption < 1) {
+							continue;
+						}
+						break;
+					case kMTGame:
+						if (symbolSubmitOption < 2) {
+							continue;
+						}
+						break;
+					case kMTAddon:
+					case kMTExtension:
+						if (symbolSubmitOption < 3) {
+							continue;
+						}
+						break;
+				}
+
+				if (canBinarySubmit && submitBinary) {
+					UploadModuleFile(module, tokenBuffer);
+				}
 
 #if defined _LINUX
-			if (submitSymbols) {
-				UploadSymbolFile(module, tokenBuffer);
-			}
+				if (submitSymbols) {
+					UploadSymbolFile(module, tokenBuffer);
+				}
 #endif
+			}
 		}
 
 		delete[] response;
