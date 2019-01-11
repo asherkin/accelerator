@@ -237,6 +237,35 @@ int main(int argc, char *argv[])
 			auto module = processState.modules()->GetModuleAtIndex(moduleIndex);
 
 			auto debugFile = module->debug_file();
+			std::string vdsoOutputPath = "";
+
+			if (debugFile == "linux-gate.so") {
+				auto workingDir = getcwd(nullptr, 0);
+				vdsoOutputPath = workingDir + std::string("/linux-gate.so");
+				int auxvStart = 0;
+				while (environ[auxvStart++] != nullptr);
+				struct {
+					int id;
+					void *value;
+				} *auxvEntry = (decltype(auxvEntry))&environ[auxvStart];
+				for (int auxvIndex = 0; true; ++auxvIndex) {
+					if (auxvEntry[auxvIndex].id == 0) break;
+					if (auxvEntry[auxvIndex].id != 33) continue; // AT_SYSINFO_EHDR
+					Elf32_Ehdr *vdsoHdr = (Elf32_Ehdr *)auxvEntry[auxvIndex].value;
+					auto vdsoSize = vdsoHdr->e_shoff + (vdsoHdr->e_shentsize * vdsoHdr->e_shnum);
+					void *vdsoBuffer = malloc(vdsoSize);
+					memcpy(vdsoBuffer, vdsoHdr, vdsoSize);
+					FILE *vdsoFile = fopen(vdsoOutputPath.c_str(), "wb");
+					if (vdsoFile) {
+						fwrite(vdsoBuffer, 1, vdsoSize, vdsoFile);
+						fclose(vdsoFile);
+						debugFile = vdsoOutputPath;
+					}
+					free(vdsoBuffer);
+				}
+				free(workingDir);
+			}
+
 			if (debugFile[0] != '/') {
 				continue;
 			}
@@ -272,6 +301,10 @@ int main(int argc, char *argv[])
 			auto output = outputStream.str();
 			output = output.substr(0, output.find("\n"));
 			printf("%s\n", output.c_str());
+
+			if (debugFile == vdsoOutputPath) {
+				unlink(vdsoOutputPath.c_str());
+			}
 		}
 #endif
 	}

@@ -12,9 +12,9 @@ if [ ! -d "depot_tools" ]; then
 fi
 
 if [ ! -d "src" ]; then
-  ./depot_tools/fetch --nohooks breakpad
+  PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/fetch.py --nohooks breakpad
 else
-  ./depot_tools/gclient sync --nohooks
+  PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/gclient.py sync --nohooks
 fi
 
 if [ ! -d "build" ]; then

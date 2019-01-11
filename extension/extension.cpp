@@ -487,6 +487,35 @@ class UploadThread: public IThread
 #if defined _LINUX
 	bool UploadSymbolFile(const google_breakpad::CodeModule *module, const char *presubmitToken) {
 		auto debugFile = module->debug_file();
+		std::string vdsoOutputPath = "";
+
+		if (debugFile == "linux-gate.so") {
+			char vdsoOutputPathBuffer[512];
+			g_pSM->BuildPath(Path_SM, vdsoOutputPathBuffer, sizeof(vdsoOutputPathBuffer), "data/dumps/linux-gate.so");
+			vdsoOutputPath = vdsoOutputPathBuffer;
+			int auxvStart = 0;
+			while (environ[auxvStart++] != nullptr);
+			struct {
+				int id;
+				void *value;
+			} *auxvEntry = (decltype(auxvEntry))&environ[auxvStart];
+			for (int auxvIndex = 0; true; ++auxvIndex) {
+				if (auxvEntry[auxvIndex].id == 0) break;
+				if (auxvEntry[auxvIndex].id != 33) continue; // AT_SYSINFO_EHDR
+				Elf32_Ehdr *vdsoHdr = (Elf32_Ehdr *)auxvEntry[auxvIndex].value;
+				auto vdsoSize = vdsoHdr->e_shoff + (vdsoHdr->e_shentsize * vdsoHdr->e_shnum);
+				void *vdsoBuffer = malloc(vdsoSize);
+				memcpy(vdsoBuffer, vdsoHdr, vdsoSize);
+				FILE *vdsoFile = fopen(vdsoOutputPath.c_str(), "wb");
+				if (vdsoFile) {
+					fwrite(vdsoBuffer, 1, vdsoSize, vdsoFile);
+					fclose(vdsoFile);
+					debugFile = vdsoOutputPath;
+				}
+				free(vdsoBuffer);
+			}
+		}
+
 		if (debugFile[0] != '/') {
 			return false;
 		}
@@ -521,6 +550,10 @@ class UploadThread: public IThread
 		auto output = outputStream.str();
 		// output = output.substr(0, output.find("\n"));
 		// printf(">>> %s\n", output.c_str());
+
+		if (debugFile == vdsoOutputPath) {
+			unlink(vdsoOutputPath.c_str());
+		}
 
 		IWebForm *form = webternet->CreateForm();
 
@@ -691,6 +724,10 @@ class UploadThread: public IThread
 		const auto &codeFile = module->code_file();
 
 #ifndef WIN32
+		if (codeFile == "linux-gate.so") {
+			return kMTSystem;
+		}
+
 		if (codeFile[0] != '/') {
 #else
 		if (codeFile[1] != ':') {
