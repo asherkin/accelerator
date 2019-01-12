@@ -240,30 +240,39 @@ int main(int argc, char *argv[])
 			std::string vdsoOutputPath = "";
 
 			if (debugFile == "linux-gate.so") {
-				auto workingDir = getcwd(nullptr, 0);
-				vdsoOutputPath = workingDir + std::string("/linux-gate.so");
-				int auxvStart = 0;
-				while (environ[auxvStart++] != nullptr);
-				struct {
-					int id;
-					void *value;
-				} *auxvEntry = (decltype(auxvEntry))&environ[auxvStart];
-				for (int auxvIndex = 0; true; ++auxvIndex) {
-					if (auxvEntry[auxvIndex].id == 0) break;
-					if (auxvEntry[auxvIndex].id != 33) continue; // AT_SYSINFO_EHDR
-					Elf32_Ehdr *vdsoHdr = (Elf32_Ehdr *)auxvEntry[auxvIndex].value;
-					auto vdsoSize = vdsoHdr->e_shoff + (vdsoHdr->e_shentsize * vdsoHdr->e_shnum);
-					void *vdsoBuffer = malloc(vdsoSize);
-					memcpy(vdsoBuffer, vdsoHdr, vdsoSize);
-					FILE *vdsoFile = fopen(vdsoOutputPath.c_str(), "wb");
-					if (vdsoFile) {
-						fwrite(vdsoBuffer, 1, vdsoSize, vdsoFile);
-						fclose(vdsoFile);
-						debugFile = vdsoOutputPath;
+				FILE *auxvFile = fopen("/proc/self/auxv", "rb");
+				if (auxvFile) {
+					auto workingDir = getcwd(nullptr, 0);
+					vdsoOutputPath = workingDir + std::string("/linux-gate.so");
+					free(workingDir);
+
+					while (!feof(auxvFile)) {
+						int auxvEntryId = 0;
+						fread(&auxvEntryId, sizeof(auxvEntryId), 1, auxvFile);
+						long auxvEntryValue = 0;
+						fread(&auxvEntryValue, sizeof(auxvEntryValue), 1, auxvFile);
+
+						if (auxvEntryId == 0) break;
+						if (auxvEntryId != 33) continue; // AT_SYSINFO_EHDR
+
+						Elf32_Ehdr *vdsoHdr = (Elf32_Ehdr *)auxvEntryValue;
+						auto vdsoSize = vdsoHdr->e_shoff + (vdsoHdr->e_shentsize * vdsoHdr->e_shnum);
+						void *vdsoBuffer = malloc(vdsoSize);
+						memcpy(vdsoBuffer, vdsoHdr, vdsoSize);
+
+						FILE *vdsoFile = fopen(vdsoOutputPath.c_str(), "wb");
+						if (vdsoFile) {
+							fwrite(vdsoBuffer, 1, vdsoSize, vdsoFile);
+							fclose(vdsoFile);
+							debugFile = vdsoOutputPath;
+						}
+
+						free(vdsoBuffer);
+						break;
 					}
-					free(vdsoBuffer);
+
+					fclose(auxvFile);
 				}
-				free(workingDir);
 			}
 
 			if (debugFile[0] != '/') {
