@@ -26,8 +26,12 @@ cmd /c depot_tools\gclient sync --nohooks
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 :DONESRC
 
-git -C src am -3 ../../patches/*.patch
+cd src
+git config user.name patches
+git config user.email patches@localhost
+git am -3 ../../patches/*.patch
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
+cd ..
 
 @IF EXIST gyp\NUL GOTO HASGYP
 git clone --depth=1 --branch=master https://chromium.googlesource.com/external/gyp.git gyp

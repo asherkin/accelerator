@@ -18,7 +18,11 @@ else
   PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/gclient.py sync --nohooks
 fi
 
-git -C src am -3 ../../patches/*.patch
+cd src
+git config user.name patches
+git config user.email patches@localhost
+git am -3 ../../patches/*.patch
+cd ..
 
 if [ ! -d "build" ]; then
   mkdir build
