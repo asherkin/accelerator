@@ -20,9 +20,14 @@ cmd /c depot_tools\fetch --nohooks breakpad
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 GOTO DONESRC
 :HASSRC
+git -C src checkout origin/master
+@IF %errorlevel% neq 0 EXIT /b %errorlevel%
 cmd /c depot_tools\gclient sync --nohooks
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 :DONESRC
+
+git -C src am -3 ../../patches/*.patch
+@IF %errorlevel% neq 0 EXIT /b %errorlevel%
 
 @IF EXIST gyp\NUL GOTO HASGYP
 git clone --depth=1 --branch=master https://chromium.googlesource.com/external/gyp.git gyp

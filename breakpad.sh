@@ -14,8 +14,11 @@ fi
 if [ ! -d "src" ]; then
   PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/fetch.py --nohooks breakpad
 else
+  git -C src checkout origin/master
   PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/gclient.py sync --nohooks
 fi
+
+git -C src am -3 ../../patches/*.patch
 
 if [ ! -d "build" ]; then
   mkdir build

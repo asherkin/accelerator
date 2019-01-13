@@ -1,0 +1,50 @@
+From 372a974415a35dac48fdef49a774f8d974734ea6 Mon Sep 17 00:00:00 2001
+From: Asher Baker <asherkin@limetech.io>
+Date: Sun, 13 Jan 2019 12:35:05 +0000
+Subject: [PATCH 2/2] Write FUNC records instead of PUBLIC for ELF symbols with
+ sizes
+
+---
+ src/common/linux/elf_symbols_to_module.cc | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/src/common/linux/elf_symbols_to_module.cc b/src/common/linux/elf_symbols_to_module.cc
+index 562875e1..e11a5265 100644
+--- a/src/common/linux/elf_symbols_to_module.cc
++++ b/src/common/linux/elf_symbols_to_module.cc
+@@ -156,19 +156,28 @@ bool ELFSymbolsToModule(const uint8_t *symtab_section,
+   while(!iterator->at_end) {
+     if (ELF32_ST_TYPE(iterator->info) == STT_FUNC &&
+         iterator->shndx != SHN_UNDEF) {
+-      Module::Extern *ext = new Module::Extern(iterator->value);
+-      ext->name = SymbolString(iterator->name_offset, strings);
++      string name = SymbolString(iterator->name_offset, strings);
+ #if !defined(__ANDROID__)  // Android NDK doesn't provide abi::__cxa_demangle.
+       int status = 0;
+       char* demangled =
+-          abi::__cxa_demangle(ext->name.c_str(), NULL, NULL, &status);
++          abi::__cxa_demangle(name.c_str(), NULL, NULL, &status);
+       if (demangled) {
+         if (status == 0)
+-          ext->name = demangled;
++          name = demangled;
+         free(demangled);
+       }
+ #endif
++#if 1
++      if (iterator->size) {
++        Module::Function *fun = new Module::Function(name, iterator->value);
++        fun->ranges.push_back(Module::Range(iterator->value, iterator->size));
++        module->AddFunction(fun);
++      }
++#else
++      Module::Extern *ext = new Module::Extern(iterator->value);
++      ext->name = name;
+       module->AddExtern(ext);
++#endif
+     }
+     ++iterator;
+   }
+-- 
+2.17.2
+
