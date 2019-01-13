@@ -29,7 +29,7 @@ cmd /c depot_tools\gclient sync --nohooks
 cd src
 git config user.name patches
 git config user.email patches@localhost
-git am -3 ..\..\patches\*.patch
+powershell -Command "& {git am -3 $(ls ..\..\patches\*.patch | %% {$_.FullName})}"
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 cd ..
 
