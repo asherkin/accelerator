@@ -431,7 +431,14 @@ class UploadThread: public IThread
 			}
 
 			presubmitToken[0] = '\0';
-			PresubmitResponse presubmitResponse = PresubmitCrashDump(path, presubmitToken, sizeof(presubmitToken));
+			PresubmitResponse presubmitResponse = kPRUploadCrashDumpAndMetadata;
+
+			const char *presubmitOption = g_pSM->GetCoreConfigValue("MinidumpPresubmit");
+			bool canPresubmit = !presubmitOption || (tolower(presubmitOption[0]) == 'y' || presubmitOption[0] == '1');
+
+			if (canPresubmit) {
+				presubmitResponse = PresubmitCrashDump(path, presubmitToken, sizeof(presubmitToken));
+			}
 
 			switch (presubmitResponse) {
 				case kPRLocalError:
