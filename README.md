@@ -9,5 +9,12 @@ Throttle will compare the crash to other existing crash reports and provide a li
 - [Download the latest build for your OS](https://builds.limetech.org/?p=accelerator)
 - Extract the `.zip` file and merge the `addons/sourcemod` directory with the one on your server.
 
+## Configuration
+
+Edit `addons/sourcemod/configs/core.cfg` in order to link your crash reports to your steam account
+```
+"MinidumpAccount"  "<insert your steam64 id here>"
+```
+
 ## More information
 If you'd like to know more information then please read [this thread](https://forums.alliedmods.net/showthread.php?t=277703).
