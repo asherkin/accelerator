@@ -1,0 +1,28 @@
+From dbfb9811ef8d9f4f2b19f50c0534c865ab3698c9 Mon Sep 17 00:00:00 2001
+From: patches <patches@localhost>
+Date: Sun, 28 Apr 2019 18:45:57 +0000
+Subject: [PATCH 3/3] Avoid using _ZNSsC1ERKSsjRKSaIcE GLIBCXX symbol due to
+ version compat issues
+
+---
+ src/common/dwarf/elf_reader.cc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/common/dwarf/elf_reader.cc b/src/common/dwarf/elf_reader.cc
+index 4135a51a..bfaaeefe 100644
+--- a/src/common/dwarf/elf_reader.cc
++++ b/src/common/dwarf/elf_reader.cc
+@@ -1202,8 +1202,8 @@ const char *ElfReader::GetSectionInfoByName(const string &section_name,
+ 
+ bool ElfReader::SectionNamesMatch(const string &name, const string &sh_name) {
+   if ((name.find(".debug_", 0) == 0) && (sh_name.find(".zdebug_", 0) == 0)) {
+-    const string name_suffix(name, strlen(".debug_"));
+-    const string sh_name_suffix(sh_name, strlen(".zdebug_"));
++    const string name_suffix(&name.c_str()[strlen(".debug_")]);
++    const string sh_name_suffix(&sh_name.c_str()[strlen(".zdebug_")]);
+     return name_suffix == sh_name_suffix;
+   }
+   return name == sh_name;
+-- 
+2.17.2
+

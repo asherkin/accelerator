@@ -99,6 +99,7 @@ class SM:
 					self.compiler.AddToListVar('CXXFLAGS', '-Wno-implicit-exception-spec-mismatch')
 				self.compiler.AddToListVar('CDEFINES', 'HAVE_STDINT_H')
 				self.compiler.AddToListVar('CDEFINES', 'GNUC')
+				self.compiler.AddToListVar('CDEFINES', '_GLIBCXX_USE_CXX11_ABI=0')
 				if self.vendor == 'gcc':
 					self.compiler.AddToListVar('CFLAGS', '-mfpmath=sse')
 			elif isinstance(cxx, Cpp.MSVC):

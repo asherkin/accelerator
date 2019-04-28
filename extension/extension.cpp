@@ -54,6 +54,36 @@ public:
 	}
 };
 
+// Taken from https://hg.mozilla.org/mozilla-central/file/3eb7623b5e63b37823d5e9c562d56e586604c823/build/unix/stdc%2B%2Bcompat/stdc%2B%2Bcompat.cpp
+extern "C" void __attribute__((weak)) __cxa_throw_bad_array_new_length() {
+    abort();
+}
+
+namespace std {
+    /* We shouldn't be throwing exceptions at all, but it sadly turns out
+       we call STL (inline) functions that do. */
+    void __attribute__((weak)) __throw_out_of_range_fmt(char const* fmt, ...) {
+        va_list ap;
+        char buf[1024];  // That should be big enough.
+
+        va_start(ap, fmt);
+        vsnprintf(buf, sizeof(buf), fmt, ap);
+        buf[sizeof(buf) - 1] = 0;
+        va_end(ap);
+
+        __throw_range_error(buf);
+    }
+} // namespace std
+
+// Updated versions of the SM ones for C++14
+void operator delete(void *ptr, size_t sz) {
+	free(ptr);
+}
+
+void operator delete[](void *ptr, size_t sz) {
+	free(ptr);
+}
+
 #elif defined _WINDOWS
 #define _STDINT // ~.~
 #include "client/windows/handler/exception_handler.h"
@@ -71,7 +101,6 @@ public:
 
 #include <sstream>
 #include <streambuf>
-#include <random>
 
 Accelerator g_accelerator;
 SMEXT_LINK(&g_accelerator);
@@ -390,11 +419,9 @@ class UploadThread: public IThread
 		if (!serverId[0]) {
 			serverIdFile = fopen(path, "w");
 			if (serverIdFile) {
-				std::random_device rd;
-				std::uniform_int_distribution<int> dist(0, 255);
 				g_pSM->Format(serverId, sizeof(serverId), "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-					dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), 0x40 | (dist(rd) & 0x0F), dist(rd),
-					0x80 | (dist(rd) & 0x3F), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd), dist(rd));
+					rand() % 255, rand() % 255, rand() % 255, rand() % 255, rand() % 255, rand() % 255, 0x40 | ((rand() % 255) & 0x0F), rand() % 255,
+					0x80 | ((rand() % 255) & 0x3F), rand() % 255, rand() % 255, rand() % 255, rand() % 255, rand() % 255, rand() % 255, rand() % 255);
 				fputs(serverId, serverIdFile);
 				fclose(serverIdFile);
 			}

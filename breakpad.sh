@@ -30,7 +30,7 @@ fi
 
 cd build
 
-../src/configure --enable-m32
+../src/configure --enable-m32 CXXFLAGS="-g -O2 -D_GLIBCXX_USE_CXX11_ABI=0"
 
 make src/tools/linux/dump_syms/dump_syms
 make src/client/linux/libbreakpad_client.a
