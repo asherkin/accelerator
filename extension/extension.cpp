@@ -1194,7 +1194,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	handler = new google_breakpad::ExceptionHandler(
 		std::wstring(buf, num_chars), NULL, dumpCallback, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL,
-		static_cast<MINIDUMP_TYPE>(MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo), NULL, NULL);
+		static_cast<MINIDUMP_TYPE>(MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo), static_cast<const wchar_t *>(NULL), NULL);
 
 	vectoredHandler = AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
 
