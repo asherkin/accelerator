@@ -1192,8 +1192,9 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	wchar_t *buf = new wchar_t[sizeof(dumpStoragePath)];
 	size_t num_chars = mbstowcs(buf, dumpStoragePath, sizeof(dumpStoragePath));
 
-	handler = new google_breakpad::ExceptionHandler(std::wstring(buf, num_chars), NULL, dumpCallback, NULL,
-		google_breakpad::ExceptionHandler::HANDLER_ALL, MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo, NULL, NULL);
+	handler = new google_breakpad::ExceptionHandler(
+		std::wstring(buf, num_chars), NULL, dumpCallback, NULL, google_breakpad::ExceptionHandler::HANDLER_ALL,
+		static_cast<MINIDUMP_TYPE>(MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo), NULL, NULL);
 
 	vectoredHandler = AddVectoredExceptionHandler(0, BreakpadVectoredHandler);
 
