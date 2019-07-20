@@ -20,7 +20,8 @@ cmd /c depot_tools\fetch --nohooks breakpad
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 GOTO DONESRC
 :HASSRC
-git -C src checkout origin/master
+git -C src fetch
+git -C src reset --hard origin/master
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 cmd /c depot_tools\gclient sync --nohooks
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
@@ -29,7 +30,7 @@ cmd /c depot_tools\gclient sync --nohooks
 cd src
 git config user.name patches
 git config user.email patches@localhost
-powershell -Command "& {git am -3 $(ls ..\..\patches\*.patch | %% {$_.FullName})}"
+powershell -Command "& {git am -3 --keep-cr $(ls ..\..\patches\*.patch | %% {$_.FullName})}"
 @IF %errorlevel% neq 0 EXIT /b %errorlevel%
 cd ..
 

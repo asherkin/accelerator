@@ -14,14 +14,15 @@ fi
 if [ ! -d "src" ]; then
   PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/fetch.py --nohooks breakpad
 else
-  git -C src checkout origin/master
+  git -C src fetch
+  git -C src reset --hard origin/master
   PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/gclient.py sync --nohooks
 fi
 
 cd src
 git config user.name patches
 git config user.email patches@localhost
-git am -3 ../../patches/*.patch
+git am -3 --keep-cr ../../patches/*.patch
 cd ..
 
 if [ ! -d "build" ]; then
