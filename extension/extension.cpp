@@ -56,23 +56,23 @@ public:
 
 // Taken from https://hg.mozilla.org/mozilla-central/file/3eb7623b5e63b37823d5e9c562d56e586604c823/build/unix/stdc%2B%2Bcompat/stdc%2B%2Bcompat.cpp
 extern "C" void __attribute__((weak)) __cxa_throw_bad_array_new_length() {
-    abort();
+	abort();
 }
 
 namespace std {
-    /* We shouldn't be throwing exceptions at all, but it sadly turns out
-       we call STL (inline) functions that do. */
-    void __attribute__((weak)) __throw_out_of_range_fmt(char const* fmt, ...) {
-        va_list ap;
-        char buf[1024];  // That should be big enough.
+	/* We shouldn't be throwing exceptions at all, but it sadly turns out
+	   we call STL (inline) functions that do. */
+	void __attribute__((weak)) __throw_out_of_range_fmt(char const* fmt, ...) {
+		va_list ap;
+		char buf[1024];  // That should be big enough.
 
-        va_start(ap, fmt);
-        vsnprintf(buf, sizeof(buf), fmt, ap);
-        buf[sizeof(buf) - 1] = 0;
-        va_end(ap);
+		va_start(ap, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, ap);
+		buf[sizeof(buf) - 1] = 0;
+		va_end(ap);
 
-        __throw_range_error(buf);
-    }
+		__throw_range_error(buf);
+	}
 } // namespace std
 
 // Updated versions of the SM ones for C++14
@@ -146,6 +146,27 @@ PluginInfo plugins[256];
 #endif
 
 #if defined _LINUX
+void terminateHandler()
+{
+	const char *msg = "missing exception";
+	std::exception_ptr pEx = std::current_exception();
+	if (pEx) {
+		try {
+			std::rethrow_exception(pEx);
+		} catch(const std::exception &e) {
+			msg = strdup(e.what());
+		} catch(...) {
+			msg = "unknown exception";
+		}
+	}
+
+	size_t msgLength = strlen(msg) + 2;
+	volatile char * volatile msgForCrashDumps = (char *)alloca(msgLength);
+	strcpy((char *)msgForCrashDumps + 1, msg);
+
+	abort();
+}
+
 void (*SignalHandler)(int, siginfo_t *, void *);
 
 const int kExceptionSignals[] = {
@@ -253,6 +274,8 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 
 void OnGameFrame(bool simulating)
 {
+	std::set_terminate(terminateHandler);
+
 	bool weHaveBeenFuckedOver = false;
 	struct sigaction oact;
 
@@ -609,7 +632,7 @@ class UploadThread: public IThread
 		if (presubmitToken && presubmitToken[0]) {
 			form->AddString("PresubmitToken", presubmitToken);
 		}
-		
+
 		form->AddString("symbol_file", output.c_str());
 
 		MemoryDownloader data;
