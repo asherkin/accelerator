@@ -135,6 +135,18 @@ char steamInf[1024];
 char dumpStoragePath[512];
 char logPath[512];
 
+struct ProfilerEntry {
+	ProfilerEntry(const char *pName, volatile void *stackVarPtr) {
+		strncpy(name, pName, sizeof(name));
+		stackAddr = (uint64_t)stackVarPtr;
+	}
+
+	uint64_t stackAddr;
+	char name[248];
+};
+
+std::vector<ProfilerEntry> g_ProfilerEntries;
+
 google_breakpad::ExceptionHandler *handler = NULL;
 
 #if defined _LINUX
@@ -223,6 +235,25 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 			sys_write(extra, spewBuffer, my_strlen(spewBuffer));
 			sys_write(extra, "-------- CONSOLE HISTORY END --------\n", 38);
 		}
+	}
+
+	int count = g_ProfilerEntries.size();
+	if (count > 0) {
+		sys_write(extra, "-------- SOURCEPAWN STACK BEGIN --------\n", 41);
+		for (int i = count - 1; i >= 0; --i) {
+			const ProfilerEntry &entry = g_ProfilerEntries[i];
+			if (my_strcmp(entry.name, "EnterJIT") == 0) {
+				continue;
+			}
+
+			char strAddr[32];
+			my_uitos(strAddr, entry.stackAddr, my_uint_len(entry.stackAddr));
+			sys_write(extra, strAddr, my_strlen(strAddr));
+			sys_write(extra, " ", 1);
+			sys_write(extra, entry.name, my_strlen(entry.name));
+			sys_write(extra, "\n", 1);
+		}
+		sys_write(extra, "-------- SOURCEPAWN STACK END --------\n", 39);
 	}
 
 	sys_close(extra);
@@ -1097,6 +1128,56 @@ const char *GetCmdLine()
 	return (const char *)(reinterpret_cast<VFuncEmptyClass*>(cmdline)->*u.mfpnew)();
 }
 
+class LoggingProfilingTool: public IProfilingTool
+{
+	virtual const char *Name() {
+		return "Accelerator";
+	}
+
+	virtual const char *Description() {
+		return "Accelerator SourcePawn call stack collection.";
+	}
+
+	virtual void RenderHelp(void (*render)(const char* fmt, ...)) {
+
+	}
+
+	virtual bool Start() {
+		return true;
+	}
+
+	virtual void Stop(void (*render)(const char* fmt, ...)) {
+
+	}
+
+	virtual void Dump() {
+
+	}
+
+	virtual bool IsActive() {
+		return true;
+	}
+
+	virtual bool IsAttached() {
+		return true;
+	}
+
+	virtual void EnterScope(const char *group, const char *name) {
+		rootconsole->ConsolePrint("!!! EnterScope(\"%s\", \"%s\")", group, name);
+
+		volatile int p;
+		g_ProfilerEntries.emplace_back(name, &p);
+	}
+
+	virtual void LeaveScope() {
+		rootconsole->ConsolePrint("!!! LeaveScope()");
+
+		if (!g_ProfilerEntries.empty()) {
+			g_ProfilerEntries.pop_back();
+		}
+	}
+} g_ProfilingTool;
+
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	sharesys->AddDependency(myself, "webternet.ext", true, true);
@@ -1214,6 +1295,9 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		}
 
 		strncpy(crashSourceModVersion, spEnvironment->APIv2()->GetVersionString(), sizeof(crashSourceModVersion));
+
+		spEnvironment->APIv2()->SetProfilingTool(&g_ProfilingTool);
+		spEnvironment->APIv2()->EnableProfiling();
 	} while(false);
 
 	plsys->AddPluginsListener(this);

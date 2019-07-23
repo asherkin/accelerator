@@ -5,7 +5,7 @@ environment:
 install:
   - cd ..
   - git clone --depth=1 --branch=1.8-dev --recursive https://github.com/alliedmodders/sourcemod sourcemod-1.8
-  - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
+  - git clone --depth=1 --branch=master --recursive https://github.com/alliedmodders/ambuild
   - cd ambuild
   - C:\python27\python.exe setup.py install
   - cd %APPVEYOR_BUILD_FOLDER%
