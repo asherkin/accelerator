@@ -229,44 +229,6 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 		}
 	}
 
-#if 0
-	char pis[64];
-	char pds[32];
-	for (unsigned i = 0; i < plugin_count; ++i) {
-		PluginInfo *p = &plugins[i];
-		if (p->serial == 0) continue;
-		my_uitos(pds, i, my_uint_len(i));
-		pds[my_uint_len(i)] = '\0';
-		my_strlcpy(pis, "plugin[", sizeof(pis));
-		my_strlcat(pis, pds, sizeof(pis));
-		my_strlcat(pis, "].", sizeof(pis));
-		sys_write(extra, pis, my_strlen(pis));
-		sys_write(extra, "filename=", 9);
-		sys_write(extra, p->filename, my_strlen(p->filename));
-		sys_write(extra, "\n", 1);
-		sys_write(extra, pis, my_strlen(pis));
-		sys_write(extra, "name=", 5);
-		sys_write(extra, p->name, my_strlen(p->name));
-		sys_write(extra, "\n", 1);
-		sys_write(extra, pis, my_strlen(pis));
-		sys_write(extra, "author=", 7);
-		sys_write(extra, p->author, my_strlen(p->author));
-		sys_write(extra, "\n", 1);
-		sys_write(extra, pis, my_strlen(pis));
-		sys_write(extra, "description=", 12);
-		sys_write(extra, p->description, my_strlen(p->description));
-		sys_write(extra, "\n", 1);
-		sys_write(extra, pis, my_strlen(pis));
-		sys_write(extra, "version=", 8);
-		sys_write(extra, p->version, my_strlen(p->version));
-		sys_write(extra, "\n", 1);
-		sys_write(extra, pis, my_strlen(pis));
-		sys_write(extra, "url=", 4);
-		sys_write(extra, p->url, my_strlen(p->url));
-		sys_write(extra, "\n", 1);
-	}
-#endif
-
 	sys_close(extra);
 
 	return succeeded;
@@ -1226,28 +1188,17 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #error Bad platform.
 #endif
 
-#if 0
-	IPluginIterator *i = plsys->GetPluginIterator();
-	while (i->MorePlugins()) {
-		IPlugin *p = i->GetPlugin();
-		const sm_plugininfo_t *pmi = p->GetPublicInfo();
-		PluginInfo *pi = &plugins[plugin_count++];
+	plsys->AddPluginsListener(this);
 
-		pi->serial = p->GetSerial();
-		pi->status = p->GetStatus();
-
-		strncpy(pi->filename, p->GetFilename(), sizeof(pi->filename) - 1);
-
-		strncpy(pi->name, pmi->name, sizeof(pi->name) - 1);
-		strncpy(pi->author, pmi->author, sizeof(pi->author) - 1);
-		strncpy(pi->description, pmi->description, sizeof(pi->description) - 1);
-		strncpy(pi->version, pmi->version, sizeof(pi->version) - 1);
-		strncpy(pi->url, pmi->url, sizeof(pi->url) - 1);
-
-		i->NextPlugin();
+	IPluginIterator *iterator = plsys->GetPluginIterator();
+	while (iterator->MorePlugins()) {
+		IPlugin *plugin = iterator->GetPlugin();
+		if (plugin->GetStatus() == Plugin_Running) {
+			this->OnPluginLoaded(plugin);
+		}
+		iterator->NextPlugin();
 	}
-	delete i;
-#endif
+	delete iterator;
 
 	strncpy(crashCommandLine, GetCmdLine(), sizeof(crashCommandLine) - 1);
 
@@ -1316,6 +1267,8 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Accelerator::SDK_OnUnload()
 {
+	plsys->RemovePluginsListener(this);
+
 #if defined _LINUX
 	g_pSM->RemoveGameFrameHook(OnGameFrame);
 #elif defined _WINDOWS
@@ -1332,4 +1285,163 @@ void Accelerator::SDK_OnUnload()
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
 	strncpy(crashMap, gamehelpers->GetCurrentMap(), sizeof(crashMap) - 1);
+}
+
+/* 010 Editor Template
+uint64 headerMagic;
+uint32 version;
+uint32 size;
+uint32 count;
+struct {
+    uint32 size;
+    uint32 context <format=hex>;
+    char file[];
+    uint32 count;
+    struct {
+        uint32 pcode <format=hex>;
+        char name[];
+    } functions[count] <optimize=false>;
+} plugins[count] <optimize=false>;
+uint64 tailMagic;
+*/
+
+unsigned char *serializedPluginContexts = nullptr;
+std::map<const IPluginContext *, unsigned char *> pluginContextMap;
+
+void SerializePluginContexts()
+{
+	if (serializedPluginContexts) {
+		handler->UnregisterAppMemory(serializedPluginContexts);
+		free(serializedPluginContexts);
+		serializedPluginContexts = nullptr;
+	}
+
+	uint32_t count = pluginContextMap.size();
+	if (count == 0) {
+		return;
+	}
+
+	uint32_t size = 0;
+	size += sizeof(uint64_t); // header magic
+	size += sizeof(uint32_t); // version
+	size += sizeof(uint32_t); // size
+	size += sizeof(uint32_t); // count
+
+	for (auto &it : pluginContextMap) {
+		unsigned char *buffer = it.second;
+
+		uint32_t bufferSize;
+		memcpy(&bufferSize, buffer, sizeof(uint32_t));
+
+		size += bufferSize;
+	}
+
+	size += sizeof(uint64_t); // tail magic
+
+	serializedPluginContexts = (unsigned char *)malloc(size);
+	handler->RegisterAppMemory(serializedPluginContexts, size);
+	unsigned char *cursor = serializedPluginContexts;
+
+	uint64_t headerMagic = 103582791429521979ULL;
+	memcpy(cursor, &headerMagic, sizeof(uint64_t));
+	cursor += sizeof(uint64_t);
+
+	uint32_t version = 1;
+	memcpy(cursor, &version, sizeof(uint32_t));
+	cursor += sizeof(uint32_t);
+
+	memcpy(cursor, &size, sizeof(uint32_t));
+	cursor += sizeof(uint32_t);
+
+	memcpy(cursor, &count, sizeof(uint32_t));
+	cursor += sizeof(uint32_t);
+
+	for (auto &it : pluginContextMap) {
+		unsigned char *buffer = it.second;
+
+		uint32_t bufferSize;
+		memcpy(&bufferSize, buffer, sizeof(uint32_t));
+
+		memcpy(cursor, buffer, bufferSize);
+		cursor += bufferSize;
+	}
+
+	uint64_t tailMagic = 76561197987819599ULL;
+	memcpy(cursor, &tailMagic, sizeof(uint64_t));
+	cursor += sizeof(uint64_t);
+}
+
+void Accelerator::OnPluginLoaded(IPlugin *plugin)
+{
+	IPluginRuntime *runtime = plugin->GetRuntime();
+	IPluginContext *context = plugin->GetBaseContext();
+	if (!runtime || !context) {
+		return;
+	}
+
+	const char *filename = plugin->GetFilename();
+	size_t filenameSize = strlen(filename) + 1;
+
+	uint32_t size = 0;
+	size += sizeof(uint32_t); // size
+	size += sizeof(void *); // GetBaseContext
+	size += filenameSize;
+
+	uint32_t count = runtime->GetPublicsNum();
+	size += sizeof(uint32_t); // count
+	size += count * sizeof(uint32_t); // pubinfo->code_offs
+
+	for (uint32_t i = 0; i < count; ++i) {
+		sp_public_t *pubinfo;
+		runtime->GetPublicByIndex(i, &pubinfo);
+
+		size += strlen(pubinfo->name) + 1;
+	}
+
+	unsigned char *buffer = (unsigned char *)malloc(size);
+	unsigned char *cursor = buffer;
+
+	memcpy(cursor, &size, sizeof(uint32_t));
+	cursor += sizeof(uint32_t);
+
+	memcpy(cursor, &context, sizeof(void *));
+	cursor += sizeof(void *);
+
+	memcpy(cursor, filename, filenameSize);
+	cursor += filenameSize;
+
+	memcpy(cursor, &count, sizeof(uint32_t));
+	cursor += sizeof(uint32_t);
+
+	for (uint32_t i = 0; i < count; ++i) {
+		sp_public_t *pubinfo;
+		runtime->GetPublicByIndex(i, &pubinfo);
+
+		memcpy(cursor, &pubinfo->code_offs, sizeof(uint32_t));
+		cursor += sizeof(uint32_t);
+
+		size_t nameSize = strlen(pubinfo->name) + 1;
+		memcpy(cursor, pubinfo->name, nameSize);
+		cursor += nameSize;
+	}
+
+	pluginContextMap[context] = buffer;
+
+	SerializePluginContexts();
+}
+
+void Accelerator::OnPluginUnloaded(IPlugin *plugin)
+{
+	IPluginContext *context = plugin->GetBaseContext();
+	if (!context) {
+		return;
+	}
+
+	auto it = pluginContextMap.find(context);
+	if (it != pluginContextMap.end()) {
+		free(it->second);
+		pluginContextMap.erase(it);
+	}
+
+	SerializePluginContexts();
 }
