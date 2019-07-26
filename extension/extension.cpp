@@ -107,6 +107,7 @@ void operator delete[](void *ptr, size_t sz) {
 
 #include <sstream>
 #include <streambuf>
+#include <memory>
 
 Accelerator g_accelerator;
 SMEXT_LINK(&g_accelerator);
