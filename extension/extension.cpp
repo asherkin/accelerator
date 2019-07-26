@@ -19,6 +19,12 @@
 
 #include "extension.h"
 
+#ifndef PLATFORM_ARCH_FOLDER
+#define PLATFORM_ARCH_FOLDER ""
+#endif
+
+#include <sp_vm_api.h>
+
 #include <IWebternet.h>
 #include "MemoryDownloader.h"
 
@@ -122,28 +128,13 @@ char crashGamePath[512];
 char crashCommandLine[1024];
 char crashSourceModPath[512];
 char crashGameDirectory[256];
+char crashSourceModVersion[32];
 char steamInf[1024];
 
 char dumpStoragePath[512];
 char logPath[512];
 
 google_breakpad::ExceptionHandler *handler = NULL;
-
-# if 0
-struct PluginInfo {
-	unsigned int serial;
-	PluginStatus status;
-	char filename[256];
-	char name[256];
-	char author[256];
-	char description[256];
-	char version[256];
-	char url[256];
-};
-
-unsigned int plugin_count;
-PluginInfo plugins[256];
-#endif
 
 #if defined _LINUX
 void terminateHandler()
@@ -212,6 +203,10 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor, 
 	sys_write(extra, crashSourceModPath, my_strlen(crashSourceModPath));
 	sys_write(extra, "\nGameDirectory=", 15);
 	sys_write(extra, crashGameDirectory, my_strlen(crashGameDirectory));
+	if (crashSourceModVersion[0]) {
+		sys_write(extra, "\nSourceModVersion=", 18);
+		sys_write(extra, crashSourceModVersion, my_strlen(crashSourceModVersion));
+	}
 	sys_write(extra, "\nExtensionVersion=", 18);
 	sys_write(extra, SM_VERSION, my_strlen(SM_VERSION));
 	sys_write(extra, "\nExtensionBuild=", 16);
@@ -1187,6 +1182,38 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #else
 #error Bad platform.
 #endif
+
+	do {
+		char spJitPath[512];
+		g_pSM->BuildPath(Path_SM, spJitPath, sizeof(spJitPath), "bin/" PLATFORM_ARCH_FOLDER "sourcepawn.jit.x86." PLATFORM_LIB_EXT);
+
+		char spJitError[255];
+		std::unique_ptr<ILibrary> spJit(libsys->OpenLibrary(spJitPath, spJitError, sizeof(spJitError)));
+		if (!spJit) {
+			smutils->LogMessage(myself, "WARNING: Failed to load SourcePawn library %s: %s", spJitPath, spJitError);
+			break;
+		}
+
+		GetSourcePawnFactoryFn factoryFn = (GetSourcePawnFactoryFn)spJit->GetSymbolAddress("GetSourcePawnFactory");
+		if (!factoryFn) {
+			smutils->LogMessage(myself, "WARNING: SourcePawn library is out of date: No factory function.");
+			break;
+		}
+
+		ISourcePawnFactory *spFactory = factoryFn(0x0207);
+		if (!spFactory) {
+			smutils->LogMessage(myself, "WARNING: SourcePawn library is out of date: Failed to get version 2.7", 0x0207);
+			break;
+		}
+
+		ISourcePawnEnvironment *spEnvironment = spFactory->CurrentEnvironment();
+		if (!spEnvironment) {
+			smutils->LogMessage(myself, "WARNING: Could not get SourcePawn environment.");
+			break;
+		}
+
+		strncpy(crashSourceModVersion, spEnvironment->APIv2()->GetVersionString(), sizeof(crashSourceModVersion));
+	} while(false);
 
 	plsys->AddPluginsListener(this);
 

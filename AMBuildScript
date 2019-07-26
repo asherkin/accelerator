@@ -32,7 +32,7 @@ class SM:
 			self.compiler.DetectAll(AMBuild)
 
 			#Detect variables
-			envvars = { 'SOURCEMOD': 'sourcemod-1.7' }
+			envvars = { 'SOURCEMOD': 'sourcemod-1.8' }
 
 			# Finds if a dict with `key` set to `value` is present on the dict of dicts `dictionary`
 			def findDictByKey(dictionary, key, value):
