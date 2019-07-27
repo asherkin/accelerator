@@ -333,6 +333,9 @@ static bool dumpCallback(const wchar_t* dump_path,
 	fprintf(extra, "\nCommandLine=%s", crashCommandLine);
 	fprintf(extra, "\nSourceModPath=%s", crashSourceModPath);
 	fprintf(extra, "\nGameDirectory=%s", crashGameDirectory);
+	if (crashSourceModVersion[0]) {
+		fprintf(extra, "\nSourceModVersion=%s", crashSourceModVersion);
+	}
 	fprintf(extra, "\nExtensionVersion=%s", SM_VERSION);
 	fprintf(extra, "\nExtensionBuild=%s", SM_BUILD_UNIQUEID);
 	fprintf(extra, "%s", steamInf);
@@ -345,7 +348,7 @@ static bool dumpCallback(const wchar_t* dump_path,
 			GetSpewFastcall(spewBuffer, sizeof(spewBuffer));
 		}
 
-		if (strlen(spewBuffer) > 0) {
+		if (spewBuffer[0]) {
 			fprintf(extra, "-------- CONSOLE HISTORY BEGIN --------\n%s-------- CONSOLE HISTORY END --------\n", spewBuffer);
 		}
 	}
@@ -1213,7 +1216,13 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 			break;
 		}
 
-		strncpy(crashSourceModVersion, spEnvironment->APIv2()->GetVersionString(), sizeof(crashSourceModVersion));
+		ISourcePawnEngine2 *spEngine2 = spEnvironment->APIv2();
+		if (!spEngine2) {
+			smutils->LogMessage(myself, "WARNING: Could not get SourcePawn engine2.");
+			break;
+		}
+
+		strncpy(crashSourceModVersion, spEngine2->GetVersionString(), sizeof(crashSourceModVersion));
 	} while(false);
 
 	plsys->AddPluginsListener(this);
