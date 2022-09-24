@@ -12,11 +12,11 @@ if [ ! -d "depot_tools" ]; then
 fi
 
 if [ ! -d "src" ]; then
-  PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/fetch.py --nohooks breakpad
+  PYTHONDONTWRITEBYTECODE=1 python3 ./depot_tools/fetch.py --nohooks breakpad
 else
   git -C src fetch
   git -C src reset --hard origin/master
-  PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/gclient.py sync --nohooks
+  PYTHONDONTWRITEBYTECODE=1 python3 ./depot_tools/gclient.py sync --nohooks
 fi
 
 cd src

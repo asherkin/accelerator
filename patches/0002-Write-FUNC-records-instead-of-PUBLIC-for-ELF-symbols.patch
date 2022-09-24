@@ -1,22 +1,21 @@
-From 8aaf6e84a6704eb538f68a3e6fb6c3a8c93f1d8d Mon Sep 17 00:00:00 2001
+From b38ee2510107352b73cd02ff66f7bd1c3d1114e6 Mon Sep 17 00:00:00 2001
 From: Asher Baker <asherkin@limetech.io>
-Date: Sun, 13 Jan 2019 12:35:05 +0000
-Subject: [PATCH 2/4] Write FUNC records instead of PUBLIC for ELF symbols with
- sizes
+Date: Sun, 25 Sep 2022 15:03:27 +0200
+Subject: [PATCH 2/5] Write FUNC records instead of PUBLIC for ELF symbols with
 
 ---
  src/common/linux/elf_symbols_to_module.cc | 17 +++++++++++++----
  1 file changed, 13 insertions(+), 4 deletions(-)
 
 diff --git a/src/common/linux/elf_symbols_to_module.cc b/src/common/linux/elf_symbols_to_module.cc
-index 562875e1..e11a5265 100644
+index 4aee38d6..5b7991d5 100644
 --- a/src/common/linux/elf_symbols_to_module.cc
 +++ b/src/common/linux/elf_symbols_to_module.cc
-@@ -156,19 +156,28 @@ bool ELFSymbolsToModule(const uint8_t *symtab_section,
+@@ -156,19 +156,28 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
    while(!iterator->at_end) {
      if (ELF32_ST_TYPE(iterator->info) == STT_FUNC &&
          iterator->shndx != SHN_UNDEF) {
--      Module::Extern *ext = new Module::Extern(iterator->value);
+-      Module::Extern* ext = new Module::Extern(iterator->value);
 -      ext->name = SymbolString(iterator->name_offset, strings);
 +      string name = SymbolString(iterator->name_offset, strings);
  #if !defined(__ANDROID__)  // Android NDK doesn't provide abi::__cxa_demangle.
@@ -46,5 +45,5 @@ index 562875e1..e11a5265 100644
      ++iterator;
    }
 -- 
-2.21.0
+2.25.1
 
