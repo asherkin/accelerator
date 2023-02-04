@@ -562,12 +562,12 @@ class UploadThread: public IThread
 		{
 			StderrInhibitor stdrrInhibitor;
 
-			if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
+			if (!WriteSymbolFile(debugFileDir, debugFile, "Linux", debug_dirs, options, outputStream)) {
 				outputStream.str("");
 				outputStream.clear();
 
 				// Try again without debug dirs.
-				if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+				if (!WriteSymbolFile(debugFileDir, debugFile, "Linux", {}, options, outputStream)) {
 					if (log) fprintf(log, "Failed to process symbol file\n");
 					return false;
 				}
