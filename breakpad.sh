@@ -13,17 +13,15 @@ fi
 
 if [ ! -d "src" ]; then
   PYTHONDONTWRITEBYTECODE=1 python3 ./depot_tools/fetch.py --nohooks breakpad
-else
-  git -C src fetch
-  git -C src reset --hard origin/master
-  PYTHONDONTWRITEBYTECODE=1 python3 ./depot_tools/gclient.py sync --nohooks
 fi
 
+# update breakpad to latest no matter what
+git -C src fetch
+git -C src reset --hard origin/main # <- you want main, not master!!!
+PYTHONDONTWRITEBYTECODE=1 python3 ./depot_tools/gclient.py sync --nohooks
+
+
 cd src
-# KLUDGE!
-git am --abort || true
-# KLUDGE!!!
-git rebase --abort || true
 git config user.name patches || true
 git config user.email patches@localhost || true
 # explode if we can't apply patches

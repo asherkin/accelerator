@@ -54,6 +54,10 @@ bootstrapBreakpad()
 
 buildIt()
 {
+    if test ! -d build; then
+        mkdir -p build
+    fi
+
     pushd build
         CC=clang CXX=clang++ python3 ../configure.py \
         --mms-path=/accelerator/${amTempLocation}/mmsource-1.12/    \
