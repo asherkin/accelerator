@@ -20,9 +20,13 @@ else
 fi
 
 cd src
-git config user.name patches
-git config user.email patches@localhost
-git am -3 --keep-cr ../../patches/*.patch
+# KLUDGE!
+git am --abort || true
+# KLUDGE!!!
+git rebase --abort || true
+git config user.name patches || true
+git config user.email patches@localhost || true
+git am -3 --keep-cr ../../patches/*.patch || true
 cd ..
 
 if [ ! -d "build" ]; then
@@ -30,8 +34,7 @@ if [ ! -d "build" ]; then
 fi
 
 cd build
-
-../src/configure --enable-m32 CFLAGS="-Wno-error=deprecated" CXXFLAGS="-Wno-error=deprecated -g -O2 -D_GLIBCXX_USE_CXX11_ABI=0" CPPFLAGS=-m32
+env ac_cv_header_a_out_h=yes CXXFLAGS=-m32 CFLAGS=-m32 CPPFLAGS=-m32 ../src/configure --enable-m32 CFLAGS="-Wno-error=deprecated" CXXFLAGS="-Wno-error=deprecated -g -O2 -D_GLIBCXX_USE_CXX11_ABI=0" CPPFLAGS=-m32
 
 make src/tools/linux/dump_syms/dump_syms
 make src/client/linux/libbreakpad_client.a

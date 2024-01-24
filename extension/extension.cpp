@@ -61,9 +61,9 @@ public:
 };
 
 // Taken from https://hg.mozilla.org/mozilla-central/file/3eb7623b5e63b37823d5e9c562d56e586604c823/build/unix/stdc%2B%2Bcompat/stdc%2B%2Bcompat.cpp
-extern "C" void __attribute__((weak)) __cxa_throw_bad_array_new_length() {
-	abort();
-}
+//extern "C" void __attribute__((weak)) __cxa_throw_bad_array_new_length() {
+//	abort();
+//}
 
 namespace std {
 	/* We shouldn't be throwing exceptions at all, but it sadly turns out
@@ -555,9 +555,17 @@ class UploadThread: public IThread
 			debugFileDir + "/.debug",
 			"/usr/lib/debug" + debugFileDir,
 		};
-
+/*
+struct DumpOptions {
+  DumpOptions(SymbolData symbol_data,
+              bool handle_inter_cu_refs,
+              bool enable_multiple_field)
+      : symbol_data(symbol_data),
+        handle_inter_cu_refs(handle_inter_cu_refs),
+        enable_multiple_field(enable_multiple_field) {}
+*/
 		std::ostringstream outputStream;
-		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true);
+		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true, false);
 
 		{
 			StderrInhibitor stdrrInhibitor;

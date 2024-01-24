@@ -5,3 +5,6 @@
 # Virtual env
 .venv
 venv
+
+
+/am_temp
