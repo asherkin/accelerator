@@ -9,7 +9,7 @@ builder.SetBuildFolder('package')
 folder_list = [
   'addons/sourcemod/extensions',
   #'addons/sourcemod/scripting/include',
-  #'addons/sourcemod/gamedata',
+  'addons/sourcemod/gamedata',
   #'addons/sourcemod/configs',
 ]
 
@@ -34,11 +34,10 @@ def CopyFiles(src, dest, files):
 #)
 
 # GameData files
-#CopyFiles('gamedata', 'addons/sourcemod/gamedata',
-#  [ 'myfile.txt',
+CopyFiles('gamedata', 'addons/sourcemod/gamedata',
+  [ 'accelerator.games.txt' ]
 #  'file2.txt'
-#  ]
-#)
+)
 
 # Config Files
 #CopyFiles('configs', 'addons/sourcemod/configs',
@@ -46,6 +45,7 @@ def CopyFiles(src, dest, files):
 #  'otherconfig.cfg,
 #  ]
 #)
+CopyFiles('gamedata', 'addons/sourcemod/extensions', 'accelerator.autoload')
 
 # Copy binaries.
 for cxx_task in Extension.extensions:

@@ -565,7 +565,7 @@ struct DumpOptions {
         enable_multiple_field(enable_multiple_field) {}
 */
 		std::ostringstream outputStream;
-		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true, false);
+		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true /*, false */);
 
 		{
 			StderrInhibitor stdrrInhibitor;
