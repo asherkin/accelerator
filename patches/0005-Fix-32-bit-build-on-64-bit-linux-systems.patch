@@ -1,0 +1,25 @@
+From 02a0fcc0685dc8c4a6c4e1d38f4704b4213ddc34 Mon Sep 17 00:00:00 2001
+From: maxime1907 <19607336+maxime1907@users.noreply.github.com>
+Date: Sun, 25 Sep 2022 15:28:26 +0200
+Subject: [PATCH 5/5] Fix 32 bit build on 64 bit linux systems
+
+---
+ src/common/stabs_reader.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/common/stabs_reader.h b/src/common/stabs_reader.h
+index 3f5f0a8f..68713503 100644
+--- a/src/common/stabs_reader.h
++++ b/src/common/stabs_reader.h
+@@ -56,7 +56,7 @@
+ #ifdef HAVE_MACH_O_NLIST_H
+ #include <mach-o/nlist.h>
+ #elif defined(HAVE_A_OUT_H)
+-#include <a.out.h>
++#include <linux/a.out.h>
+ #endif
+ 
+ #include <string>
+-- 
+2.25.1
+

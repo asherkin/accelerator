@@ -50,6 +50,7 @@ def BuildEverything():
 			'linux/crc32.cc',
 			'linux/dump_symbols.cc',
 			'linux/elf_symbols_to_module.cc',
+			'linux/breakpad_getcontext.S',
 		])
 
 	if AMBuild.target['platform'] in ['linux']:

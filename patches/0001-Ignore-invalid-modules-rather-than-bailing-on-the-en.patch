@@ -1,7 +1,7 @@
 From 1f35257db226d6d0189cff0832a97cccc639c91a Mon Sep 17 00:00:00 2001
 From: Asher Baker <asherkin@limetech.io>
 Date: Sun, 13 Jan 2019 12:34:45 +0000
-Subject: [PATCH 1/4] Ignore invalid modules rather than bailing on the entire
+Subject: [PATCH 1/5] Ignore invalid modules rather than bailing on the entire
  module list
 
 ---

@@ -1,0 +1,159 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04]
+        sourcemod-version: [1.11-dev]
+        chromium-depot-tools-version: [08bb5c487f80147a236360ea50f4544890530779]
+        chromium-breakpad-version: [e3af4457b8355fcf1814e6dfb6073a848b44a282]
+        ambuild-version: [master]
+        include:
+          - os: ubuntu-20.04
+            target-archs: x86,x86_64
+            sdks: sdk2013
+
+    steps:
+      - name: Install Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -yq --no-install-recommends g++-multilib
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: extension
+
+      - name: Checkout SourceMod
+        uses: actions/checkout@v2
+        with:
+          repository: alliedmodders/sourcemod
+          ref: ${{ matrix.sourcemod-version }}
+          path: sourcemod
+          submodules: recursive
+
+      - name: Checkout sm-ext-common
+        uses: actions/checkout@v2
+        with:
+          repository: srcdslab/sm-ext-common
+          path: sourcemod/extensions/sm-ext-common
+
+      - name: Checkout chromium depot_tools
+        working-directory: extension
+        run: |
+          mkdir breakpad && cd breakpad
+          git clone --recursive --branch=main https://chromium.googlesource.com/chromium/tools/depot_tools.git depot_tools
+          cd depot_tools
+          git checkout ${{ matrix.chromium-depot-tools-version }}
+
+      - name: Install sourcemod dependencies
+        run: |
+          bash sourcemod/tools/checkout-deps.sh -m -s ${{ matrix.sdks }}
+          pip uninstall ambuild -y
+          rm -rf ambuild
+
+      - name: Checkout AMBuild
+        uses: actions/checkout@v2
+        with:
+          repository: alliedmodders/ambuild
+          path: ambuild
+          ref: ${{ matrix.ambuild-version }}
+
+      - name: Install AMBuild
+        uses: BSFishy/pip-action@v1
+        with:
+          packages: ./ambuild
+
+      - name: Install Linux breakpad
+        working-directory: extension/breakpad
+        if: runner.os == 'Linux'
+        run: |
+          cp depot_tools/.vpython3 .
+          PYTHONDONTWRITEBYTECODE=1 ./depot_tools/vpython3 ./depot_tools/fetch.py --nohooks breakpad
+
+          cd src
+          git config user.name patches
+          git config user.email patches@localhost
+          git checkout ${{ matrix.chromium-breakpad-version }}
+          git am -3 --keep-cr ../../patches/*.patch
+          cd ..
+
+          mkdir build && cd build
+
+          env ac_cv_header_a_out_h=yes ../src/configure --enable-m32 CFLAGS="-Wno-error=deprecated" CXXFLAGS="-Wno-error=deprecated -g -O2 -D_GLIBCXX_USE_CXX11_ABI=0" CPPFLAGS=-m32
+
+          make src/tools/linux/dump_syms/dump_syms
+          make src/client/linux/libbreakpad_client.a
+          make src/libbreakpad.a src/third_party/libdisasm/libdisasm.a
+
+      - name: Install Windows breakpad
+        working-directory: extension
+        if: runner.os == 'Windows'
+        run: |
+          breakpad.bat
+
+      - name: Build
+        working-directory: extension
+        shell: bash
+        # env:
+        #   BREAKPAD_SYMBOL_SERVER: ${{ secrets.BREAKPAD_SYMBOL_SERVER }}
+        run: |
+          export PATH=$PATH:$PWD/breakpad/build/src/tools/linux/dump_syms/
+          mkdir build && cd build
+          python ../configure.py --enable-optimize
+          python ./build.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ runner.os }}
+          path: extension/build/package
+
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Package
+        run: |
+          version=`echo $GITHUB_REF | sed "s/refs\/tags\///"`
+          ls -Rall
+          if [ -d "./Linux/" ]; then
+            cd ./Linux/
+            tar -czf ../${{ github.event.repository.name }}-${version}-linux.tar.gz -T <(\ls -1)
+            cd -
+          fi
+          if [ -d "./macOS/" ]; then
+            cd ./macOS/
+            tar -czf ../${{ github.event.repository.name }}-${version}-mac.tar.gz -T <(\ls -1)
+            cd -
+          fi
+          if [ -d "./Windows/" ]; then
+            cd ./Windows/
+            tar -czf ../${{ github.event.repository.name }}-${version}-windows.tar.gz -T <(\ls -1)
+            cd -
+          fi
+
+      - name: Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: '*.tar.gz'
+          tag: ${{ github.ref }}
+          file_glob: true

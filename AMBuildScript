@@ -32,7 +32,7 @@ class SM:
 			self.compiler.DetectAll(AMBuild)
 
 			#Detect variables
-			envvars = { 'SOURCEMOD': 'sourcemod-1.8' }
+			envvars = { 'SOURCEMOD': 'sourcemod' }
 
 			# Finds if a dict with `key` set to `value` is present on the dict of dicts `dictionary`
 			def findDictByKey(dictionary, key, value):
@@ -81,12 +81,15 @@ class SM:
 				self.compiler.AddToListVar('CFLAGS', '-Wno-unused')
 				self.compiler.AddToListVar('CFLAGS', '-Wno-switch')
 				self.compiler.AddToListVar('CFLAGS', '-Wno-implicit-exception-spec-mismatch')
+				self.compiler.AddToListVar('CFLAGS', '-Wno-builtin-declaration-mismatch')
+				self.compiler.AddToListVar('CFLAGS', '-Wno-unused-result')
+				self.compiler.AddToListVar('CFLAGS', '-Wno-stringop-truncation')
 				self.compiler.AddToListVar('CFLAGS', '-msse')
 				self.compiler.AddToListVar('CFLAGS', '-g3')
 				self.compiler.AddToListVar('CFLAGS', '-m32')
 				self.compiler.AddToListVar('POSTLINKFLAGS', '-m32')
 				self.compiler.AddToListVar('POSTLINKFLAGS', '-Wl,-z,defs')
-				self.compiler.AddToListVar('CXXFLAGS', '-std=c++11')
+				self.compiler.AddToListVar('CXXFLAGS', '-std=c++14')
 				self.compiler.AddToListVar('CXXFLAGS', '-fno-threadsafe-statics')
 				self.compiler.AddToListVar('CXXFLAGS', '-Wno-non-virtual-dtor')
 				self.compiler.AddToListVar('CXXFLAGS', '-Wno-overloaded-virtual')
