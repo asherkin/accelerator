@@ -14,7 +14,7 @@ jobs:
         - name: Zip packages
           run: |
             apt-get update
-            apt-get install p7zip-full
+            apt-get install p7zip-full -y
             cd build
             7za a -r accelerator.zip package/
             ls -la
