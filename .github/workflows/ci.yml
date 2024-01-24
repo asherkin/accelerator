@@ -1,0 +1,12 @@
+name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:11
+    steps:
+        - name: Checkout Project
+          uses: actions/checkout@v1
+
+        - name: Run
+          run: bash ./cicd/_accelerator_docker_build_internal.sh
