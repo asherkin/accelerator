@@ -10,3 +10,20 @@ jobs:
 
         - name: Run
           run: pwd && ls -la && mkdir /accelerator && cp * /accelerator -Rfv ; cd /accelerator && bash ./cicd/_accelerator_docker_build_internal.sh
+
+        - name: Zip packages
+          run: |
+            apt update
+            apt install 7zip
+            cd build
+            7za a -r accelerator.zip package/
+            ls -la
+            pwd
+            cd ../
+
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: accelerator
+            path: |
+              build/accelerator.zip
