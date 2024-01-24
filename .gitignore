@@ -8,3 +8,4 @@ venv
 
 
 /am_temp
+!/cicd
