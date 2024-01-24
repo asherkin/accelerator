@@ -26,7 +26,8 @@ git am --abort || true
 git rebase --abort || true
 git config user.name patches || true
 git config user.email patches@localhost || true
-git am -3 --keep-cr ../../patches/*.patch || true
+# explode if we can't apply patches
+git am -3 --keep-cr ../../patches/*.patch || exit 1
 cd ..
 
 if [ ! -d "build" ]; then

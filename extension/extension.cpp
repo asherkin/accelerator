@@ -556,6 +556,10 @@ class UploadThread: public IThread
 			"/usr/lib/debug" + debugFileDir,
 		};
 /*
+
+There's somehow two versions of this struct floating around
+
+
 struct DumpOptions {
   DumpOptions(SymbolData symbol_data,
               bool handle_inter_cu_refs,
@@ -563,9 +567,25 @@ struct DumpOptions {
       : symbol_data(symbol_data),
         handle_inter_cu_refs(handle_inter_cu_refs),
         enable_multiple_field(enable_multiple_field) {}
+
+vs
+
+struct DumpOptions {
+  DumpOptions(SymbolData symbol_data, bool handle_inter_cu_refs)
+      : symbol_data(symbol_data),
+        handle_inter_cu_refs(handle_inter_cu_refs) {
+  }
+
+  SymbolData symbol_data;
+  bool handle_inter_cu_refs;
+};
+
+To avoid an arcane error if you've got the wrong one I'm just going to stick a static assert here
+
 */
+		static_assert(sizeof(google_breakpad::DumpOptions) == 8, "DumpOptions size changed!");
 		std::ostringstream outputStream;
-		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true /*, false */);
+		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true /*, false - this is related to the "multiple symbol field" added in cc7abac0 upstream */);
 
 		{
 			StderrInhibitor stdrrInhibitor;
