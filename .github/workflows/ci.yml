@@ -29,4 +29,4 @@ jobs:
           with:
             name: accelerator
             path: |
-              build/accelerator.zip
+              /accelerator/build/accelerator.zip
