@@ -34,10 +34,7 @@ def CopyFiles(src, dest, files):
 #)
 
 # GameData files
-CopyFiles('gamedata', 'addons/sourcemod/gamedata',
-  [ 'accelerator.games.txt' ]
-#  'file2.txt'
-)
+CopyFiles('', 'addons/sourcemod/gamedata', [ 'accelerator.games.txt', ] )
 
 # Config Files
 #CopyFiles('configs', 'addons/sourcemod/configs',
@@ -45,7 +42,7 @@ CopyFiles('gamedata', 'addons/sourcemod/gamedata',
 #  'otherconfig.cfg,
 #  ]
 #)
-CopyFiles('gamedata', 'addons/sourcemod/extensions', 'accelerator.autoload')
+CopyFiles('', 'addons/sourcemod/extensions', ['accelerator.autoload', ])
 
 # Copy binaries.
 for cxx_task in Extension.extensions:
