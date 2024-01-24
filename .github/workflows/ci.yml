@@ -9,4 +9,4 @@ jobs:
           uses: actions/checkout@v1
 
         - name: Run
-          run: pwd && ls -la && mkdir /accelerator && cp .* /accelerator -Rfv && cd /accelerator && bash ./cicd/_accelerator_docker_build_internal.sh
+          run: pwd && ls -la && mkdir /accelerator && cp * /accelerator -Rfv ; cd /accelerator && bash ./cicd/_accelerator_docker_build_internal.sh
