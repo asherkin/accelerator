@@ -59,7 +59,7 @@ buildIt()
         --mms-path=/accelerator/${amTempLocation}/mmsource-1.12/    \
         --sm-path=/accelerator/${amTempLocation}/sourcemod/         \
         --hl2sdk-root=/accelerator/${amTempLocation}/               \
-        -s tf2
+
         ambuild
     popd
 }
