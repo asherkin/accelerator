@@ -7,5 +7,5 @@
 venv
 
 
-/am_temp
+/_am_temp
 !/cicd
