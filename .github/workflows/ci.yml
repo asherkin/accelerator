@@ -9,4 +9,4 @@ jobs:
           uses: actions/checkout@v1
 
         - name: Run
-          run: bash ./cicd/_accelerator_docker_build_internal.sh
+          run: pwd && ls -la && bash ./cicd/_accelerator_docker_build_internal.sh
