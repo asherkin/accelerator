@@ -4,6 +4,7 @@ set -euxo pipefail
 
 bootstrapPkgs()
 {
+    # we really need to slim this shit down lol
     dpkg --add-architecture i386 &&     \
         apt-get update -y &&            \
         apt-get install -y              \
@@ -17,31 +18,35 @@ bootstrapPkgs()
         --no-install-recommends
 }
 
-
-succCloneLocation="/accelerator/am_temp/successful_clone"
+amTempLocation="_am_temp"
+succCloneLocation="/accelerator/${amTempLocation}/successful_clone"
 bootstrapAM()
 {
+    # need to install ambuild if we already cloned, otherwise checkout-deps will do it 4 us
     if test -f "${succCloneLocation}"; then
-        pushd am_temp
-        pip install ./ambuild
+        pushd ${amTempLocation}
+            pip install ./ambuild
         popd
         return 255;
     fi
 
-    rm -rf /accelerator/am_temp/    || true
-    mkdir -p am_temp                || exit 1
-    pushd am_temp                   || exit 1
+    rm -rf /accelerator/"${amTempLocation}"/    || true
+    mkdir -p ${amTempLocation}                  || exit 1
+    pushd ${amTempLocation}                     || exit 1
         git clone --recursive https://github.com/alliedmodders/sourcemod || exit 1
 
         # skip downloading mysql we do not care about it
-        bash sourcemod/tools/checkout-deps.sh -m    || exit 1
+        bash sourcemod/tools/checkout-deps.sh -m || exit 1
+
+        # we need to do this no matter what for some fcking reason
+        pip install ./ambuild
 
         # make a blank file so that we don't reclone everything if we don't need to
         true > "${succCloneLocation}" || exit 1
     popd
 }
 
-
+# TODO: move this all into cicd folder
 bootstrapBreakpad()
 {
     bash breakpad.sh
@@ -51,9 +56,9 @@ buildIt()
 {
     pushd build
         CC=clang CXX=clang++ python3 ../configure.py \
-        --mms-path=/accelerator/am_temp/mmsource-1.12/ \
-        --sm-path=/accelerator/am_temp/sourcemod/ \
-        --hl2sdk-root=/accelerator/am_temp/ \
+        --mms-path=/accelerator/${amTempLocation}/mmsource-1.12/    \
+        --sm-path=/accelerator/${amTempLocation}/sourcemod/         \
+        --hl2sdk-root=/accelerator/${amTempLocation}/               \
         -s tf2
         ambuild
     popd
