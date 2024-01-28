@@ -1,6 +1,8 @@
 # vim: set ts=2 sw=2 tw=99 noet ft=python:
 import os, sys
 
+builder.SetBuildFolder('/')
+
 project = builder.LibraryProject('accelerator.ext')
 project.sources = [
   'extension.cpp',
@@ -17,15 +19,19 @@ def AddSourceFilesFromDir(path, files):
 for cxx in Accelerator.targets:
   binary = Accelerator.ConfigureExtension(project, cxx, builder)
   compiler = binary.compiler
+  # Wait for breakpad to be patched
+  compiler.sourcedeps += Accelerator.breakpad_patch
+  # We depend on breakpad on config
+  compiler.sourcedeps += Accelerator.breakpad_config[compiler.target.arch]
 
   compiler.defines += ['HAVE_CONFIG_H']
   compiler.cxxincludes += [
-    os.path.join(builder.currentSourcePath, '..', 'breakpad', 'src'),
-    os.path.join(builder.currentSourcePath, '..', 'breakpad', 'build', compiler.target.arch, 'src'),
+    os.path.join(builder.sourcePath, 'third_party', 'breakpad', 'src'),
+    os.path.join(builder.buildPath, 'third_party', 'config', compiler.target.arch),
   ]
 
   if compiler.target.platform in ['linux']:
-    binary.sources += AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'breakpad', 'src', 'common'), [
+    binary.sources += AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'third_party', 'breakpad', 'src', 'common'), [
       'dwarf_cfi_to_module.cc',
       'dwarf_cu_to_module.cc',
       'dwarf_line_to_module.cc',
@@ -45,15 +51,8 @@ for cxx in Accelerator.targets:
       'linux/breakpad_getcontext.S'
 		])
 
-    compiler.postlink += [
-      '-pthread',
-      '-lz',
-      os.path.join(builder.currentSourcePath, '..', 'breakpad', 'build', compiler.target.arch, 'src', 'libbreakpad.a'),
-      os.path.join(builder.currentSourcePath, '..', 'breakpad', 'build', compiler.target.arch, 'src', 'third_party', 'libdisasm', 'libdisasm.a'),
-      os.path.join(builder.currentSourcePath, '..', 'breakpad', 'build', compiler.target.arch, 'src', 'client', 'linux', 'libbreakpad_client.a'),
-    ]
-
-  if compiler.like('gcc'):
-    compiler.defines += ['_GLIBCXX_USE_CXX11_ABI=0']
+  Accelerator.link_libbreakpad_client(compiler, builder)
+  Accelerator.link_libbreakpad(compiler, builder)
+  Accelerator.link_libdisasm(compiler, builder)
 
 Accelerator.extension = builder.Add(project)

@@ -1,0 +1,145 @@
+# vim: set ts=2 sw=2 tw=99 noet ft=python:
+import os, sys
+
+def AddSourceFilesFromDir(path, files):
+  list = []
+  for file in files:
+    list.append(os.path.join(path, file))
+  return list
+
+builder.SetBuildFolder('./third_party/breakpad')
+
+libbreakpad_client = builder.StaticLibraryProject('libbreakpad_client')
+libbreakpad_client.sources = AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src'),[
+  'common/convert_UTF.cc',
+  'common/string_conversion.cc',
+])
+
+libbreakpad_client_linux =  AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src'),[
+  'client/minidump_file_writer.cc',
+  'client/linux/crash_generation/crash_generation_client.cc',
+  'client/linux/crash_generation/crash_generation_server.cc',
+  'client/linux/dump_writer_common/thread_info.cc',
+  'client/linux/dump_writer_common/ucontext_reader.cc',
+  'client/linux/handler/exception_handler.cc',
+  'client/linux/handler/minidump_descriptor.cc',
+  'client/linux/log/log.cc',
+  'client/linux/microdump_writer/microdump_writer.cc',
+  'client/linux/minidump_writer/linux_core_dumper.cc',
+  'client/linux/minidump_writer/linux_dumper.cc',
+  'client/linux/minidump_writer/linux_ptrace_dumper.cc',
+  'client/linux/minidump_writer/minidump_writer.cc',
+  'client/linux/minidump_writer/pe_file.cc',
+  'common/linux/elf_core_dump.cc',
+  'common/linux/elfutils.cc',
+  'common/linux/file_id.cc',
+  'common/linux/guid_creator.cc',
+  'common/linux/linux_libc_support.cc',
+  'common/linux/memory_mapped_file.cc',
+  'common/linux/safe_readlink.cc'
+])
+
+libbreakpad_client_windows =  AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src'),[
+  'client/windows/crash_generation/client_info.cc',
+  'client/windows/crash_generation/crash_generation_client.cc',
+  'client/windows/crash_generation/crash_generation_server.cc',
+  'client/windows/crash_generation/minidump_generator.cc',
+  'client/windows/handler/exception_handler.cc',
+  'common/windows/guid_string.cc'
+])
+
+libbreakpad = builder.StaticLibraryProject('libbreakpad')
+libbreakpad.sources = AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src'),[
+  'processor/basic_code_modules.cc',
+  'processor/basic_source_line_resolver.cc',
+  'processor/call_stack.cc',
+  'processor/cfi_frame_info.cc',
+  'processor/convert_old_arm64_context.cc',
+  'processor/disassembler_x86.cc',
+  'processor/dump_context.cc',
+  'processor/dump_object.cc',
+  'processor/exploitability.cc',
+  'processor/exploitability_linux.cc',
+  'processor/exploitability_win.cc',
+  'processor/fast_source_line_resolver.cc',
+  'processor/logging.cc',
+  'processor/microdump.cc',
+  'processor/microdump_processor.cc',
+  'processor/minidump.cc',
+  'processor/minidump_processor.cc',
+  'processor/module_comparer.cc',
+  'processor/module_serializer.cc',
+  'processor/pathname_stripper.cc',
+  'processor/process_state.cc',
+  'processor/proc_maps_linux.cc',
+  'processor/simple_symbol_supplier.cc',
+  'processor/source_line_resolver_base.cc',
+  'processor/stack_frame_cpu.cc',
+  'processor/stack_frame_symbolizer.cc',
+  'processor/stackwalk_common.cc',
+  'processor/stackwalker.cc',
+  'processor/stackwalker_amd64.cc',
+  'processor/stackwalker_arm.cc',
+  'processor/stackwalker_arm64.cc',
+  'processor/stackwalker_address_list.cc',
+  'processor/stackwalker_mips.cc',
+  'processor/stackwalker_ppc.cc',
+  'processor/stackwalker_ppc64.cc',
+  'processor/stackwalker_riscv.cc',
+  'processor/stackwalker_riscv64.cc',
+  'processor/stackwalker_sparc.cc',
+  'processor/stackwalker_x86.cc',
+  'processor/symbolic_constants_win.cc',
+  'processor/tokenize.cc'
+])
+
+libbreakpad_linux = AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src'),[
+  'common/linux/scoped_pipe.cc',
+  'common/linux/scoped_tmpfile.cc',
+  'processor/disassembler_objdump.cc'
+])
+
+libbreakpad_windows = []
+
+libdisasm = builder.StaticLibraryProject('libdisasm')
+libdisasm.sources = AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src', 'third_party', 'libdisasm'),[
+  'ia32_implicit.c',
+  'ia32_insn.c',
+  'ia32_invariant.c',
+  'ia32_modrm.c',
+  'ia32_opcode_tables.c',
+  'ia32_operand.c',
+  'ia32_reg.c',
+  'ia32_settings.c',
+  'x86_disasm.c',
+  'x86_format.c',
+  'x86_imm.c',
+  'x86_insn.c',
+  'x86_misc.c',
+  'x86_operand_list.c'
+])
+
+libraries = [libbreakpad_client, libbreakpad, libdisasm]
+libraries_platform_src = [(libbreakpad_client_linux, libbreakpad_client_windows), (libbreakpad_linux, libbreakpad_windows), ([],[])]
+
+for cxx in Accelerator.targets:
+  for (library, (linux_src, windows_src)) in zip(libraries, libraries_platform_src):
+    binary = Accelerator.ConfigureLibrary(library, cxx, builder)
+    compiler = binary.compiler
+    # Wait for breakpad to be patched
+    compiler.sourcedeps += Accelerator.breakpad_patch
+
+    if compiler.target.platform == 'linux':
+      binary.sources += linux_src
+    if compiler.target.platform == 'windows':
+      binary.sources += windows_src
+
+    compiler.cxxincludes += [
+      os.path.join(builder.currentSourcePath, 'breakpad', 'src')
+    ]
+
+    compiler.defines += ['UNICODE']
+
+Accelerator.libbreakpad = builder.Add(libbreakpad)
+Accelerator.libbreakpad_client = builder.Add(libbreakpad_client)
+Accelerator.libdisasm = builder.Add(libdisasm)

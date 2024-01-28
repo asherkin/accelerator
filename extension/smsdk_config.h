@@ -40,7 +40,7 @@
 #define SMEXT_CONF_NAME			"Accelerator"
 #define SMEXT_CONF_DESCRIPTION	"SRCDS Crash Handler"
 #define SMEXT_CONF_VERSION		SM_FULL_VERSION
-#define SMEXT_CONF_AUTHOR		"Asher \"asherkin\" Baker"
+#define SMEXT_CONF_AUTHOR		"Asher \"asherkin\" Baker" " | " "Benoist \"Kenzzer\" André"
 #define SMEXT_CONF_URL			"https://crash.limetech.org/"
 #define SMEXT_CONF_LOGTAG		"CRASH"
 #define SMEXT_CONF_LICENSE		"GPL"

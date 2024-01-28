@@ -1,0 +1,76 @@
+# vim: set ts=2 sw=2 tw=99 noet ft=python:
+import os, sys
+import re
+
+def Normalize(path):
+  return os.path.abspath(os.path.normpath(os.path.join(path)))
+
+def AddFilesFromDir(path, files):
+  list = []
+  for file in files:
+    list.append(os.path.join(path, file))
+  return list
+
+def AddCwdCommand(context, cwd, inputs,
+  argv,
+  outputs,
+  folder = -1,
+  dep_type = None,
+  weak_inputs = [],
+  shared_outputs = [],
+  env_data = None,
+  fake_output = None):
+
+  base_argv = [
+    sys.executable,
+    Normalize(os.path.join(context.currentSourcePath, 'cwd_cmd.py')),
+    cwd,
+    os.path.join(context.buildPath, 'third_party', fake_output) if fake_output else '_',
+  ]
+  if fake_output :
+    outputs += [fake_output]
+  return context.AddCommand(inputs=inputs, argv=base_argv + argv, outputs=outputs, folder=folder, dep_type=dep_type, weak_inputs=weak_inputs, shared_outputs=shared_outputs, env_data=env_data)
+
+
+git_dir = Normalize(os.path.join(builder.currentSourcePath, 'breakpad'))
+patches = AddFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'patches'), [
+  "0001-Ignore-invalid-modules-rather-than-bailing-on-the-en.patch",
+  "0002-Write-FUNC-records-instead-of-PUBLIC-for-ELF-symbols.patch",
+  "0003-Support-compilation-on-VS-2015.patch",
+  "0004-Fix-Linux-a-out-include.patch",
+  "0005-Add-LSS.patch"
+])
+
+# Reset the breakpad directory before applying patches
+argv = [
+  'git',
+  'reset',
+  '--hard'
+]
+
+git_reset = AddCwdCommand(builder, git_dir,
+  inputs=patches, # We want the reset to happen again if we modify the patch files
+  outputs=[],
+  fake_output='git_reset.txt',
+  argv=argv)
+
+# Apply each of the patch available to the breakpad repository
+argv = [
+  'git',
+  'apply'
+]
+
+git_patches = []
+num = 0
+for patch in patches:
+  patch_argv = argv + [patch]
+  git_patches += AddCwdCommand(builder, git_dir,
+  inputs=patches, # Redo the command if the patches changed
+  outputs=[],
+  fake_output=str(num) + '_patch.txt',
+  argv=patch_argv,
+  weak_inputs=git_reset # We need to for the git reset to be performed
+  )
+  num = num + 1
+
+Accelerator.breakpad_patch = git_reset + git_patches

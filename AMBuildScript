@@ -28,8 +28,14 @@ class AcceleratorConfig(object):
     self.mms_root = None
     self.sm_root = None
     self.extension = None
+    self.libbreakpad_client = None
+    self.libbreakpad = None
+    self.libdisasm = None
+    self.breakpad_patch = None
     self.targets = []
     self.target_archs = set()
+    self.breakpad_config = dict()
+    self.breakpad_patch = None
 
     if builder.options.targets:
       target_archs = builder.options.targets.split(',')
@@ -100,8 +106,7 @@ class AcceleratorConfig(object):
       '-fvisibility-inlines-hidden',
       '-Wall',
       '-Werror',
-      '-msse',
-      '-g3'
+      '-msse'
     ]
 
     cxx.cxxflags += [
@@ -113,18 +118,31 @@ class AcceleratorConfig(object):
       '-Wno-implicit-exception-spec-mismatch'
     ]
 
+    cxx.postlink += ['-pthread', '-lz']
+
     if builder.options.opt == '1':
       cxx.cflags += ['-O3']
     return
 
   def configure_msvc(self, cxx):
+
+    cxx.cxxflags += [
+      '/EHsc',
+      '/std:c++17'
+    ]
+
     return
   
   def configure_linux(self, cxx):
-    cxx.defines += ['_LINUX', 'POSIX']
+    cxx.defines += ['_LINUX', 'POSIX', '_GLIBCXX_USE_CXX11_ABI=0']
     return
   
   def configure_windows(self, cxx):
+    cxx.defines += ['_WINDOWS']
+    if cxx.target.arch == 'x86':
+      cxx.defines += ['WIN32']
+    elif cxx.target.arch == 'x86_64':
+      cxx.defines += ['WIN64']
     return
   
   def configure(self):
@@ -143,13 +161,46 @@ class AcceleratorConfig(object):
       os.path.join(self.sm_root, 'sourcepawn', 'include')
     ]
 
-  def ConfigureExtension(self, project, compiler, context):
+  def link_libbreakpad_client(self, compiler, context):
+    for task in self.libbreakpad_client:
+      if task.target.arch == compiler.target.arch:
+        compiler.postlink += [os.path.join(context.buildPath, task.binary.path)]
+        compiler.linkdeps += [task.binary]
+        return
+    raise Exception('No suitable build of libbreakpad_client was found.')
+  
+  def link_libbreakpad(self, compiler, context):
+    for task in self.libbreakpad:
+      if task.target.arch == compiler.target.arch:
+        compiler.postlink += [os.path.join(context.buildPath, task.binary.path)]
+        compiler.linkdeps += [task.binary]
+        return
+    raise Exception('No suitable build of libbreakpad was found.')
+  
+  def link_libdisasm(self, compiler, context):
+    for task in self.libdisasm:
+      if task.target.arch == compiler.target.arch:
+        compiler.postlink += [os.path.join(context.buildPath, task.binary.path)]
+        compiler.linkdeps += [task.binary]
+        return
+    raise Exception('No suitable build of libdisasm was found.')
+
+  def ConfigureLibrary(self, project, compiler, context):
     binary = project.Configure(compiler, project.name, '{0} - {1}'.format(self.tag, compiler.target.arch))
+    binary.compiler.cxxincludes += [
+      os.path.join(context.currentSourcePath)
+    ]
+    return binary
+  
+  def ConfigureExtension(self, project, compiler, context):
+    binary = self.ConfigureLibrary(project, compiler, context)
     self.configure_extension(binary.compiler, context)
     return binary
 
 Accelerator = AcceleratorConfig()
 Accelerator.configure()
+
+builder.Build(['third_party/Patch', 'third_party/Configure', 'third_party/AMBuilder'], { 'Accelerator': Accelerator })
 
 BuildScripts = ['extension/AMBuilder', 'buildbot/PackageScript']
 builder.Build(BuildScripts, { 'Accelerator': Accelerator })
