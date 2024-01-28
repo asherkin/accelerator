@@ -1,0 +1,13 @@
+diff --git a/src/common/windows/pe_util.h b/src/common/windows/pe_util.h
+index 6c6b364f..80aba5e5 100644
+--- a/src/common/windows/pe_util.h
++++ b/src/common/windows/pe_util.h
+@@ -59,7 +59,7 @@ wstring GenerateDebugIdentifier(DWORD age, DWORD signature);
+ 
+ // Converts |machine| enum value to the corresponding string used by Breakpad.
+ // The enum is IMAGE_FILE_MACHINE_*, contained in winnt.h.
+-constexpr const wchar_t* FileHeaderMachineToCpuString(WORD machine) {
++static inline const wchar_t* FileHeaderMachineToCpuString(WORD machine) {
+   switch (machine) {
+     case IMAGE_FILE_MACHINE_I386: {
+       return L"x86";

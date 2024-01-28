@@ -1,242 +1,155 @@
-# vim: set ts=2 sw=2 tw=99 noet ft=python:
-import os
-import sys
-from ambuild.command import Command
-from ambuild.command import ShellCommand
-from ambuild.command import SymlinkCommand
+# vim: set ts=2 sw=2 tw=99 noet ft=python: 
+import os, sys, shutil
 
-class ExtractDebugInfoCommand(Command):
-	def __init__(self, binary, outfile):
-		Command.__init__(self)
-		self.binary = binary
-		self.outfile = outfile
+def ResolveEnvPath(env, folder=None):
+  if env in os.environ:
+    path = os.environ[env]
+    if os.path.isdir(path):
+      return path
+    return None
 
-	def run(self, runner, job):
-		if not self.binary.NeedsRelink(self.outfile):
-			return
+  if folder:
+    head = os.getcwd()
+    oldhead = None
+    while head != None and head != oldhead:
+      path = os.path.join(head, folder)
+      if os.path.isdir(path):
+        return path
+      oldhead = head
+      head, tail = os.path.split(head)
 
-		if AMBuild.target['platform'] == 'linux':
-			job.AddCommand(ShellCommand('objcopy --only-keep-debug ' + self.outfile + ' ' + self.outfile + '.dbg'))
-			job.AddCommand(ShellCommand('objcopy --strip-debug ' + self.outfile))
-			job.AddCommand(ShellCommand('objcopy --add-gnu-debuglink=' + os.path.basename(self.outfile) + '.dbg ' + self.outfile))
-		elif AMBuild.target['platform'] == 'darwin':
-			job.AddCommand(ShellCommand('dsymutil ' + self.outfile))
-			job.AddCommand(ShellCommand('strip -S ' + self.outfile))
+  return None
 
-class SM:
-	def __init__(self):
-		self.compiler = Cpp.Compiler()
+def Normalize(path):
+  return os.path.abspath(os.path.normpath(path))
 
-		if AMBuild.mode == 'config':
-			#Detect compilers
-			self.compiler.DetectAll(AMBuild)
+class AcceleratorConfig(object):
+  def __init__(self):
+    self.mms_root = None
+    self.sm_root = None
+    self.extension = None
+    self.targets = []
+    self.target_archs = set()
 
-			#Detect variables
-			envvars = { 'SOURCEMOD': 'sourcemod-1.8' }
+    if builder.options.targets:
+      target_archs = builder.options.targets.split(',')
+    else:
+      target_archs = ['x86', 'x86_64']
 
-			# Finds if a dict with `key` set to `value` is present on the dict of dicts `dictionary`
-			def findDictByKey(dictionary, key, value):
-				for index in dictionary:
-					elem = dictionary[index]
-					if elem[key] == value:
-						return (elem, index)
-				return None
+    for arch in target_archs:
+        try:
+            cxx = builder.DetectCxx(target_arch = arch)
+            self.target_archs.add(cxx.target.arch)
+        except Exception as e:
+            if builder.options.targets:
+                raise
+            print('Skipping target {}: {}'.format(arch, e))
+            continue
+        self.targets.append(cxx)
 
-			for i in envvars:
-				if i in os.environ:
-					path = os.environ[i]
-					if not os.path.isdir(path):
-						raise Exception('Path for {0} was not found: {1}'.format(i, path))
-				else:
-					head = os.getcwd()
-					oldhead = None
-					while head != None and head != oldhead:
-						path = os.path.join(head, envvars[i])
-						if os.path.isdir(path):
-							break
-						oldhead = head
-						head, tail = os.path.split(head)
-					if head == None or head == oldhead:
-						raise Exception('Could not find a valid path for {0}'.format(i))
-				AMBuild.cache.CacheVariable(i, path)
+    if not self.targets:
+      raise Exception('No suitable C/C++ compiler was found.')
+  
+  @property
+  def tag(self):
+    if builder.options.debug == '1':
+      return 'Debug'
+    return 'Release'
+  
+  def retrieve_sm(self):
+    if builder.options.sm_path:
+      self.sm_root = builder.options.sm_path
+    else:
+      self.sm_root = ResolveEnvPath('SOURCEMOD', 'sourcemod')
 
-			#Set up defines
-			cxx = self.compiler.cxx
-			if isinstance(cxx, Cpp.CompatGCC):
-				if isinstance(cxx, Cpp.GCC):
-					self.vendor = 'gcc'
-				elif isinstance(cxx, Cpp.Clang):
-					self.vendor = 'clang'
-				self.compiler.AddToListVar('CDEFINES', 'stricmp=strcasecmp')
-				self.compiler.AddToListVar('CDEFINES', '_stricmp=strcasecmp')
-				self.compiler.AddToListVar('CDEFINES', '_snprintf=snprintf')
-				self.compiler.AddToListVar('CDEFINES', '_vsnprintf=vsnprintf')
-				self.compiler.AddToListVar('CFLAGS', '-pipe')
-				self.compiler.AddToListVar('CFLAGS', '-fno-strict-aliasing')
-				if (self.vendor == 'gcc' and cxx.majorVersion >= 4) or self.vendor == 'clang':
-					self.compiler.AddToListVar('CFLAGS', '-fvisibility=hidden')
-					self.compiler.AddToListVar('CXXFLAGS', '-fvisibility-inlines-hidden')
-				self.compiler.AddToListVar('CFLAGS', '-Wall')
-				self.compiler.AddToListVar('CFLAGS', '-Werror')
-				self.compiler.AddToListVar('CFLAGS', '-Wno-unused')
-				self.compiler.AddToListVar('CFLAGS', '-Wno-switch')
-				self.compiler.AddToListVar('CFLAGS', '-Wno-implicit-exception-spec-mismatch')
-				self.compiler.AddToListVar('CFLAGS', '-msse')
-				self.compiler.AddToListVar('CFLAGS', '-g3')
-				self.compiler.AddToListVar('CFLAGS', '-m32')
-				self.compiler.AddToListVar('POSTLINKFLAGS', '-m32')
-				self.compiler.AddToListVar('POSTLINKFLAGS', '-Wl,-z,defs')
-				self.compiler.AddToListVar('CXXFLAGS', '-std=c++11')
-				self.compiler.AddToListVar('CXXFLAGS', '-fno-threadsafe-statics')
-				self.compiler.AddToListVar('CXXFLAGS', '-Wno-non-virtual-dtor')
-				self.compiler.AddToListVar('CXXFLAGS', '-Wno-overloaded-virtual')
-				if (self.vendor == 'gcc' and cxx.majorVersion >= 4 and cxx.minorVersion >= 3) or \
-						(self.vendor == 'clang' and cxx.majorVersion >= 3):
-					self.compiler.AddToListVar('CXXFLAGS', '-Wno-delete-non-virtual-dtor')
-				if self.vendor == 'clang' and cxx.majorVersion >= 3:
-					self.compiler.AddToListVar('CXXFLAGS', '-Wno-implicit-exception-spec-mismatch')
-				self.compiler.AddToListVar('CDEFINES', 'HAVE_STDINT_H')
-				self.compiler.AddToListVar('CDEFINES', 'GNUC')
-				self.compiler.AddToListVar('CDEFINES', '_GLIBCXX_USE_CXX11_ABI=0')
-				if self.vendor == 'gcc':
-					self.compiler.AddToListVar('CFLAGS', '-mfpmath=sse')
-			elif isinstance(cxx, Cpp.MSVC):
-				self.vendor = 'msvc'
-				if AMBuild.options.debug == '1':
-					self.compiler.AddToListVar('CFLAGS', '/MTd')
-					self.compiler.AddToListVar('POSTLINKFLAGS', '/NODEFAULTLIB:libcmt')
-				else:
-					self.compiler.AddToListVar('CFLAGS', '/MT')
-				self.compiler.AddToListVar('CDEFINES', '_CRT_SECURE_NO_DEPRECATE')
-				self.compiler.AddToListVar('CDEFINES', '_CRT_SECURE_NO_WARNINGS')
-				self.compiler.AddToListVar('CDEFINES', '_CRT_NONSTDC_NO_DEPRECATE')
-				self.compiler.AddToListVar('CXXFLAGS', '/EHsc')
-				self.compiler.AddToListVar('CFLAGS', '/W3')
-				self.compiler.AddToListVar('CFLAGS', '/nologo')
-				self.compiler.AddToListVar('CFLAGS', '/Zi')
-				self.compiler.AddToListVar('CXXFLAGS', '/TP')
-				self.compiler.AddToListVar('POSTLINKFLAGS', '/DEBUG')
-				self.compiler.AddToListVar('POSTLINKFLAGS', '/MACHINE:X86')
-				self.compiler.AddToListVar('POSTLINKFLAGS', '/SUBSYSTEM:WINDOWS')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'kernel32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'user32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'gdi32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'winspool.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'comdlg32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'advapi32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'shell32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'ole32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'oleaut32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'uuid.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'odbc32.lib')
-				self.compiler.AddToListVar('POSTLINKFLAGS', 'odbccp32.lib')
+    if not self.sm_root or not os.path.isdir(self.sm_root):
+      raise Exception('Could not find a source copy of SourceMod')
+    self.sm_root = Normalize(self.sm_root)
+    
+  def use_auto_versioning(self):
+    return not builder.options.disable_auto_versioning
+  
+  def configure_cxx(self, cxx):
+    if cxx.like('gcc'):
+      self.configure_gcc(cxx)
+    elif cxx.family == 'msvc':
+      self.configure_msvc(cxx)
+    
+    # Optimizaiton
+    if builder.options.opt == '1':
+      cxx.defines += ['NDEBUG']
 
-			#Optimization
-			if AMBuild.options.opt == '1':
-				self.compiler.AddToListVar('CDEFINES', 'NDEBUG')
-				if self.vendor == 'gcc' or self.vendor == 'clang':
-					self.compiler.AddToListVar('CFLAGS', '-O3')
-				elif self.vendor == 'msvc':
-					self.compiler.AddToListVar('CFLAGS', '/Ox')
-					self.compiler.AddToListVar('POSTLINKFLAGS', '/OPT:ICF')
-					self.compiler.AddToListVar('POSTLINKFLAGS', '/OPT:REF')
+    # Debugging
+    if builder.options.debug == '1':
+      cxx.defines += ['DEBUG', '_DEBUG']
 
-			#Debugging
-			if AMBuild.options.debug == '1':
-				self.compiler.AddToListVar('CDEFINES', 'DEBUG')
-				self.compiler.AddToListVar('CDEFINES', '_DEBUG')
-				if self.vendor == 'msvc':
-					self.compiler.AddToListVar('CFLAGS', '/Od')
-					self.compiler.AddToListVar('CFLAGS', '/RTC1')
+    # Platform-specifics
+    if cxx.target.platform == 'linux':
+      self.configure_linux(cxx)
+    elif cxx.target.platform == 'windows':
+      self.configure_windows(cxx)
 
-			#Platform-specifics
-			if AMBuild.target['platform'] == 'linux':
-				self.compiler.AddToListVar('CDEFINES', '_LINUX')
-				self.compiler.AddToListVar('CDEFINES', 'POSIX')
-				self.compiler.AddToListVar('CDEFINES', 'NO_MALLOC_OVERRIDE')
-				if self.vendor == 'gcc':
-					self.compiler.AddToListVar('POSTLINKFLAGS', '-static-libgcc')
-				if self.vendor == 'clang':
-					self.compiler.AddToListVar('POSTLINKFLAGS', '-lgcc_eh')
-			elif AMBuild.target['platform'] == 'darwin':
-				self.compiler.AddToListVar('CDEFINES', 'OSX')
-				self.compiler.AddToListVar('CDEFINES', '_OSX')
-				self.compiler.AddToListVar('POSTLINKFLAGS', '-mmacosx-version-min=10.5')
-				self.compiler.AddToListVar('POSTLINKFLAGS', ['-arch', 'i386'])
-				self.compiler.AddToListVar('POSTLINKFLAGS', '-lstdc++')
+    if self.use_auto_versioning():
+      cxx.defines += ['GIT_ACTION_BUILD']
+  
+  def configure_gcc(self, cxx):
+    cxx.cflags += [
+      '-pipe',
+      '-fno-strict-aliasing',
+      '-fvisibility=hidden',
+      '-fvisibility-inlines-hidden',
+      '-Wall',
+      '-Werror',
+      '-msse',
+      '-g3'
+    ]
 
-				# For OS X dylib versioning
-				import re
-				productFile = open(os.path.join(AMBuild.sourceFolder, 'product.version'), 'r')
-				productContents = productFile.read()
-				productFile.close()
-				m = re.match('(\d+)\.(\d+)\.(\d+).*', productContents)
-				if m == None:
-					self.version = '1.0.0'
-				else:
-					major, minor, release = m.groups()
-					self.version = '{0}.{1}.{2}'.format(major, minor, release)
-				AMBuild.cache.CacheVariable('version', self.version)
-			elif AMBuild.target['platform'] == 'windows':
-				self.compiler.AddToListVar('CDEFINES', 'WIN32')
-				self.compiler.AddToListVar('CDEFINES', '_WINDOWS')
+    cxx.cxxflags += [
+      '-fPIC',
+      '-std=c++17',
+      '-fno-threadsafe-statics',
+      '-Wno-non-virtual-dtor',
+      '-Wno-overloaded-virtual',
+      '-Wno-implicit-exception-spec-mismatch'
+    ]
 
-			#Finish up
-			self.compiler.AddToListVar('CDEFINES', 'SOURCEMOD_BUILD')
-			self.compiler.AddToListVar('CDEFINES', 'SM_GENERATED_BUILD')
-			self.compiler.AddToListVar('CINCLUDES',
-			                           os.path.join(AMBuild.outputFolder, 'includes'))
-			self.compiler.ToConfig(AMBuild, 'compiler')
-			AMBuild.cache.CacheVariable('vendor', self.vendor)
-			self.targetMap = { }
-			AMBuild.cache.CacheVariable('targetMap', self.targetMap)
-		else:
-			self.compiler.FromConfig(AMBuild, 'compiler')
-			self.targetMap = AMBuild.cache['targetMap']
+    if builder.options.opt == '1':
+      cxx.cflags += ['-O3']
+    return
 
-		if AMBuild.target['platform'] == 'windows':
-			self.compiler.AddToListVar('RCINCLUDES', os.path.join(AMBuild.sourceFolder, 'extension'))
+  def configure_msvc(self, cxx):
+    return
+  
+  def configure_linux(self, cxx):
+    cxx.defines += ['_LINUX', 'POSIX']
+    return
+  
+  def configure_windows(self, cxx):
+    return
+  
+  def configure(self):
+    self.retrieve_sm()
 
-	def DefaultCompiler(self):
-		return self.compiler.Clone()
+    for cxx in self.targets:
+      self.configure_cxx(cxx)
 
-	def JobMatters(self, jobname):
-		file = sys._getframe().f_code.co_filename
-		if AMBuild.mode == 'config':
-			self.targetMap[jobname] = file
-			return True
-		if len(AMBuild.args) == 0:
-			return True
-		if not jobname in AMBuild.args:
-			return False
+  def configure_extension(self, compiler, context):
+    compiler.cxxincludes += [
+      os.path.join(context.currentSourcePath),
+      os.path.join(self.sm_root, 'public'),
+      os.path.join(self.sm_root, 'public', 'extensions'),
+      os.path.join(self.sm_root, 'public', 'amtl', 'amtl'),
+      os.path.join(self.sm_root, 'public', 'amtl'),
+      os.path.join(self.sm_root, 'sourcepawn', 'include')
+    ]
 
-	def AutoVersion(self, folder, binary):
-		if AMBuild.target['platform'] == 'windows':
-			env = {'RCDEFINES': ['BINARY_NAME="' + binary.binaryFile + '"', 'SM_GENERATED_BUILD']}
-			binary.AddResourceFile(os.path.join(folder, 'version.rc' ), env)
-		elif AMBuild.target['platform'] == 'darwin' and isinstance(binary, Cpp.LibraryBuilder):
-			binary.compiler['POSTLINKFLAGS'].extend(['-compatibility_version', '1.0.0'])
-			binary.compiler['POSTLINKFLAGS'].extend(['-current_version', AMBuild.cache['version']])
-		else:
-			return
+  def ConfigureExtension(self, project, compiler, context):
+    binary = project.Configure(compiler, project.name, '{0} - {1}'.format(self.tag, compiler.target.arch))
+    self.configure_extension(binary.compiler, context)
+    return binary
 
-	def ExtractDebugInfo(self, job, binary):
-		src = os.path.join('..', AMBuild.outputFolder, job.workFolder, binary.binaryFile)
-		job.AddCommand(ExtractDebugInfoCommand(binary, src))
+Accelerator = AcceleratorConfig()
+Accelerator.configure()
 
-sm = SM()
-globals = {
-	'SM': sm
-}
-
-AMBuild.Include(os.path.join('buildbot', 'Versioning'), globals)
-
-FileList = [
-		['extension', 'AMBuilder'],
-		['test', 'AMBuilder'],
-		['buildbot', 'PackageScript'],
-		['buildbot', 'BreakpadSymbols']
-	]
-
-for parts in FileList:
-	AMBuild.Include(os.path.join(*parts), globals)
+BuildScripts = ['extension/AMBuilder', 'buildbot/PackageScript']
+builder.Build(BuildScripts, { 'Accelerator': Accelerator })

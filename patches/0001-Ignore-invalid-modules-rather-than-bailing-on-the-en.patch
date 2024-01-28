@@ -1,18 +1,8 @@
-From 1f35257db226d6d0189cff0832a97cccc639c91a Mon Sep 17 00:00:00 2001
-From: Asher Baker <asherkin@limetech.io>
-Date: Sun, 13 Jan 2019 12:34:45 +0000
-Subject: [PATCH 1/4] Ignore invalid modules rather than bailing on the entire
- module list
-
----
- src/processor/minidump.cc | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
-
 diff --git a/src/processor/minidump.cc b/src/processor/minidump.cc
-index 78faf77a..c4fda7b7 100644
+index 83e5a868..a7d564f2 100644
 --- a/src/processor/minidump.cc
 +++ b/src/processor/minidump.cc
-@@ -2774,7 +2774,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
+@@ -3195,7 +3195,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
          BPLOG(ERROR) << "MinidumpModuleList could not read required module "
                          "auxiliary data for module " <<
                          module_index << "/" << module_count;
@@ -21,7 +11,7 @@ index 78faf77a..c4fda7b7 100644
        }
  
        // It is safe to use module->code_file() after successfully calling
-@@ -2786,7 +2786,14 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
+@@ -3207,7 +3207,14 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
          BPLOG(ERROR) << "MinidumpModuleList found bad base address for module "
                       << module_index << "/" << module_count << ", "
                       << module.code_file();
@@ -37,7 +27,7 @@ index 78faf77a..c4fda7b7 100644
        }
  
        // Some minidumps have additional modules in the list that are duplicates.
-@@ -2813,7 +2820,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
+@@ -3234,7 +3241,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
                         << module_index << "/" << module_count << ", "
                         << module.code_file() << ", " << HexString(base_address)
                         << "+" << HexString(module_size);
@@ -46,6 +36,3 @@ index 78faf77a..c4fda7b7 100644
          }
  
          // If failed due to apparent range overlap the cause may be the client
--- 
-2.21.0
-

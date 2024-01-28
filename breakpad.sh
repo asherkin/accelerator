@@ -1,37 +1,30 @@
 #!/bin/sh
 set -ex
 
-if [ ! -d "breakpad" ]; then
-  mkdir breakpad
-fi
+cd third_party/breakpad
+git reset --hard
+git apply ../../patches/*.patch
 
-cd breakpad
+cd src/third_party
+ln -sf ../../../protobuf protobuf
+ln -sf ../../../lss lss
+cd ../..
 
-if [ ! -d "depot_tools" ]; then
-  git clone --depth=1 --branch=master https://chromium.googlesource.com/chromium/tools/depot_tools.git depot_tools
-fi
+mkdir -p build
+cd build
+mkdir -p x86
+mkdir -p x86_64
 
-if [ ! -d "src" ]; then
-  PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/fetch.py --nohooks breakpad
-else
-  git -C src fetch
-  git -C src reset --hard origin/master
-  PYTHONDONTWRITEBYTECODE=1 python2.7 ./depot_tools/gclient.py sync --nohooks
-fi
+cd x86
+../../configure --enable-m32 CXXFLAGS="-g -O2 -D_GLIBCXX_USE_CXX11_ABI=0"
 
-cd src
-git config user.name patches
-git config user.email patches@localhost
-git am -3 --keep-cr ../../patches/*.patch
+make src/tools/linux/dump_syms/dump_syms
+make src/client/linux/libbreakpad_client.a
+make src/libbreakpad.a src/third_party/libdisasm/libdisasm.a
 cd ..
 
-if [ ! -d "build" ]; then
-  mkdir build
-fi
-
-cd build
-
-../src/configure --enable-m32 CXXFLAGS="-g -O2 -D_GLIBCXX_USE_CXX11_ABI=0"
+cd x86_64
+../../configure CXXFLAGS="-g -O2 -D_GLIBCXX_USE_CXX11_ABI=0"
 
 make src/tools/linux/dump_syms/dump_syms
 make src/client/linux/libbreakpad_client.a
