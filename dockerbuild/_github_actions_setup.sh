@@ -13,4 +13,4 @@ pwd
 ls -la
 
 
-bash ./cicd/_accelerator_docker_build_internal.sh
+bash ./dockerbuild/_accelerator_docker_build_internal.sh

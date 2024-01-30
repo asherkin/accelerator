@@ -12,7 +12,7 @@ script_folder=$( cd -- "$( dirname -- "${thisiswhereiam}" )" &> /dev/null && pwd
 
 
 # this should be /whatever/directory/structure/[accelerator_root]/cicd
-build_dir="cicd"
+build_dir="dockerbuild"
 
 pushd "${script_folder}" &> /dev/null || exit 99
 

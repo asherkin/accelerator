@@ -118,8 +118,6 @@ class AcceleratorConfig(object):
       '-Wno-implicit-exception-spec-mismatch'
     ]
 
-    cxx.cflags += ['-fPIC']
-
     cxx.postlink += ['-pthread', '-lz']
 
     if builder.options.opt == '1':
