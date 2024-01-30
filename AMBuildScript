@@ -80,8 +80,8 @@ class AcceleratorConfig(object):
       self.configure_gcc(cxx)
     elif cxx.family == 'msvc':
       self.configure_msvc(cxx)
-    
-    # Optimizaiton
+
+    # Optimization
     if builder.options.opt == '1':
       cxx.defines += ['NDEBUG']
 
@@ -100,6 +100,7 @@ class AcceleratorConfig(object):
   
   def configure_gcc(self, cxx):
     cxx.cflags += [
+      '-fPIC',
       '-pipe',
       '-fno-strict-aliasing',
       '-fvisibility=hidden',
@@ -205,3 +206,4 @@ builder.Build(['third_party/Patch', 'third_party/Configure', 'third_party/AMBuil
 
 BuildScripts = ['extension/AMBuilder', 'buildbot/PackageScript']
 builder.Build(BuildScripts, { 'Accelerator': Accelerator })
+
