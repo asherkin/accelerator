@@ -110,13 +110,14 @@ class AcceleratorConfig(object):
     ]
 
     cxx.cxxflags += [
-      '-fPIC',
       '-std=c++17',
       '-fno-threadsafe-statics',
       '-Wno-non-virtual-dtor',
       '-Wno-overloaded-virtual',
       '-Wno-implicit-exception-spec-mismatch'
     ]
+
+    cxx.cflags += ['-fPIC']
 
     cxx.postlink += ['-pthread', '-lz']
 

@@ -15,6 +15,7 @@ args = { 'args': ' '.join(argv),
           'cwd': cwd }
 p = subprocess.Popen(**args)
 stdout, stderr = p.communicate()
+print(stdout.decode("utf-8"))
 if p.returncode != 0:
-  raise Exception('terminated with non-zero exitcode {0}'.format(p.returncode))
+  print(stderr.decode("utf-8"))
 sys.exit(p.returncode)

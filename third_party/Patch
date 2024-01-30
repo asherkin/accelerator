@@ -44,6 +44,10 @@ patches = AddFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'patches
 # Reset the breakpad directory before applying patches
 argv = [
   'git',
+  'clean',
+  '-fdx',
+  '&&',
+  'git',
   'reset',
   '--hard'
 ]
@@ -51,13 +55,14 @@ argv = [
 git_reset = AddCwdCommand(builder, git_dir,
   inputs=patches, # We want the reset to happen again if we modify the patch files
   outputs=[],
-  fake_output='git_reset.txt',
+  fake_output='git_clean.txt',
   argv=argv)
 
 # Apply each of the patch available to the breakpad repository
 argv = [
   'git',
-  'apply'
+  'apply',
+  '--reject'
 ]
 
 git_patches = []
@@ -69,7 +74,7 @@ for patch in patches:
   outputs=[],
   fake_output=str(num) + '_patch.txt',
   argv=patch_argv,
-  weak_inputs=git_reset # We need to for the git reset to be performed
+  weak_inputs=git_reset if num == 0 else [git_patches[-1]] + git_reset # We need to for the git reset to be performed
   )
   num = num + 1
 
