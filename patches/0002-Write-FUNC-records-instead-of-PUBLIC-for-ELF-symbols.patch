@@ -23,7 +23,7 @@ index 70d50f89..f21460bf 100644
  #endif
 +#if 1
 +      if (iterator->size) {
-+        Module::Function *fun = new Module::Function(name, iterator->value);
++        Module::Function *fun = new Module::Function(module->AddStringToPool(name), iterator->value);
 +        fun->ranges.push_back(Module::Range(iterator->value, iterator->size));
 +        module->AddFunction(fun);
 +      }
