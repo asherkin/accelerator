@@ -1,0 +1,36 @@
+diff --git a/configure b/configure
+index 3442e796..3e7c321c 100755
+--- a/configure
++++ b/configure
+@@ -7532,11 +7532,16 @@ then :
+ printf "%s\n" "#define STDC_HEADERS 1" >>confdefs.h
+ 
+ fi
+-ac_fn_c_check_header_compile "$LINENO" "a.out.h" "ac_cv_header_a_out_h" "$ac_includes_default"
++ac_fn_c_check_header_compile "$LINENO" "linux/a.out.h" "ac_cv_header_a_out_h" "$ac_includes_default"
+ if test "x$ac_cv_header_a_out_h" = xyes
+ then :
+   printf "%s\n" "#define HAVE_A_OUT_H 1" >>confdefs.h
+-
++else
++  ac_fn_c_check_header_compile "$LINENO" "a.out.h" "ac_cv_header_a_out_h" "$ac_includes_default"
++  if test "x$ac_cv_header_a_out_h" = xyes
++  then :
++    printf "%s\n" "#define HAVE_A_OUT_H_EX 1" >>confdefs.h
++  fi
+ fi
+ ac_fn_c_check_header_compile "$LINENO" "sys/mman.h" "ac_cv_header_sys_mman_h" "$ac_includes_default"
+ if test "x$ac_cv_header_sys_mman_h" = xyes
+diff --git a/src/common/stabs_reader.h b/src/common/stabs_reader.h
+index 655683f1..1e6a76b8 100644
+--- a/src/common/stabs_reader.h
++++ b/src/common/stabs_reader.h
+@@ -52,6 +52,8 @@
+ #ifdef HAVE_MACH_O_NLIST_H
+ #include <mach-o/nlist.h>
+ #elif defined(HAVE_A_OUT_H)
++#include <linux/a.out.h>
++#elif defined(HAVE_A_OUT_H_EX)
+ #include <a.out.h>
+ #endif
+ 
