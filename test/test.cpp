@@ -294,12 +294,12 @@ int main(int argc, char *argv[])
 			{
 				StderrInhibitor stdrrInhibitor;
 
-				if (!WriteSymbolFile(debugFile, debug_dirs, options, outputStream)) {
+				if (!WriteSymbolFile(debugFileDir, debugFile, "Linux", debug_dirs, options, outputStream)) {
 					outputStream.str("");
 					outputStream.clear();
 
 					// Try again without debug dirs.
-					if (!WriteSymbolFile(debugFile, {}, options, outputStream)) {
+					if (!WriteSymbolFile(debugFileDir, debugFile, "Linux", {}, options, outputStream)) {
 						// TODO: Something.
 						continue;
 					}
