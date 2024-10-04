@@ -28,6 +28,7 @@ class AcceleratorConfig(object):
     self.mms_root = None
     self.sm_root = None
     self.extension = None
+    self.libz = None
     self.libbreakpad_client = None
     self.libbreakpad = None
     self.libdisasm = None
@@ -118,7 +119,7 @@ class AcceleratorConfig(object):
       '-Wno-implicit-exception-spec-mismatch'
     ]
 
-    cxx.postlink += ['-pthread', '-lz']
+    cxx.postlink += ['-pthread', '-static-libstdc++', '-static-libgcc']
 
     if builder.options.opt == '1':
       cxx.cflags += ['-O3']
@@ -160,6 +161,14 @@ class AcceleratorConfig(object):
       os.path.join(self.sm_root, 'public', 'amtl'),
       os.path.join(self.sm_root, 'sourcepawn', 'include')
     ]
+
+  def link_libz(self, compiler, context):
+    for task in self.libz:
+      if task.target.arch == compiler.target.arch:
+        compiler.postlink += [os.path.join(context.buildPath, task.binary.path)]
+        compiler.linkdeps += [task.binary]
+        return
+    raise Exception('No suitable build of libz was found.')
 
   def link_libbreakpad_client(self, compiler, context):
     for task in self.libbreakpad_client:

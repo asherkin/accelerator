@@ -7,7 +7,33 @@ def AddSourceFilesFromDir(path, files):
     list.append(os.path.join(path, file))
   return list
 
-builder.SetBuildFolder('./third_party/breakpad')
+builder.SetBuildFolder('./third_party')
+
+libz = builder.StaticLibraryProject('libz')
+libz.sources = AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'zlib'),[
+  'adler32.c',
+  'compress.c',
+  'crc32.c',
+  'deflate.c',
+  'gzclose.c',
+  'gzlib.c',
+  'gzread.c',
+  'gzwrite.c',
+  'infback.c',
+  'inffast.c',
+  'inflate.c',
+  'inftrees.c',
+  'trees.c',
+  'uncompr.c',
+  'zutil.c'
+])
+
+for cxx in Accelerator.targets:
+  if cxx.target.platform == 'linux':
+    binary = Accelerator.ConfigureLibrary(libz, cxx, builder)
+    binary.compiler.cflags += ['-Wno-implicit-function-declaration']
+
+Accelerator.libz = builder.Add(libz)
 
 libbreakpad_client = builder.StaticLibraryProject('libbreakpad_client')
 libbreakpad_client.sources = AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, 'breakpad', 'src'),[
@@ -130,6 +156,8 @@ for cxx in Accelerator.targets:
     compiler.sourcedeps += Accelerator.breakpad_patch
 
     if compiler.target.platform == 'linux':
+      # Link against our zlib if linux
+      Accelerator.link_libz(cxx, builder)
       binary.sources += linux_src
     if compiler.target.platform == 'windows':
       binary.sources += windows_src
