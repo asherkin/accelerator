@@ -1,3 +1,5 @@
+Subject: [PATCH 5/5] Insert the linux_syscall_support.h file as a patch
+
 diff --git a/src/third_party/lss/linux_syscall_support.h b/src/third_party/lss/linux_syscall_support.h
 new file mode 100644
 index 00000000..8d09f6b0

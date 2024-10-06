@@ -1,3 +1,5 @@
+Subject: [PATCH 4/5] Fixes path to a.out.h file
+
 diff --git a/configure b/configure
 index 3442e796..3e7c321c 100755
 --- a/configure
