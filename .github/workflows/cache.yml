@@ -1,0 +1,57 @@
+name: Cache
+on:
+  workflow_call:
+    outputs:
+      key:
+        value: ${{ jobs.cache.outputs.key }}
+      dir:
+        value: .cache
+
+jobs:
+  cache:
+    name: Create cache
+    runs-on: 'ubuntu-latest'
+    outputs:
+      key: ${{ steps.cache-key.outputs.key }}
+
+    env:
+      SOURCEMOD_REF: 'e0e018c5ebcd11df9bab91b43d40bf148805c684'
+      AMBUILD_REF: '2d4620da4cdaf89cf25afc3577f920e6138ae7cd'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create cache key
+        run: |
+          echo "${{ env.SOURCEMOD_REF }}" >> cache-key
+          echo "${{ env.AMBUILD_REF }}" >> cache-key
+
+      - name: Output cache key
+        id: cache-key
+        run: |
+          ls -a
+          echo "key=cache-${{ hashFiles('cache-key') }}" >> $GITHUB_OUTPUT
+
+      - name: Retrieve the cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: ${{ steps.cache-key.outputs.key }}
+          enableCrossOsArchive: true
+
+      - uses: actions/checkout@v4
+        if: ${{ !steps.cache.outputs.cache-hit }}
+        name: SourceMod checkout
+        with:
+          repository: alliedmodders/sourcemod
+          ref: ${{ env.SOURCEMOD_REF }}
+          submodules: true
+          path: .cache/sourcemod
+
+      - uses: actions/checkout@v4
+        if: ${{ !steps.cache.outputs.cache-hit }}
+        name: AMBuild checkout
+        with:
+          repository: alliedmodders/ambuild
+          ref: ${{ env.AMBUILD_REF }}
+          path: .cache/ambuild

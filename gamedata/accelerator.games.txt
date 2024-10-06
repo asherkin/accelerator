@@ -11,7 +11,7 @@
 			{
 				"windows" "2"
 				"linux" "2"
-				"mac" "2"
+				"linux64" "2"
 			}
 		}
 
@@ -25,6 +25,7 @@
 			{
 				"library" "engine"
 				"linux"   "@_Z7GetSpewPcj"
+				"linux64" "@_Z7GetSpewPcm"
 			}
 		}
 	}
