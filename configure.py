@@ -1,10 +1,15 @@
-# vim: set ts=2 sw=2 tw=99 noet:
 import sys
-import ambuild.runner as runner
+from ambuild2 import run
 
-run = runner.Runner()
-run.options.add_option('--enable-debug', action='store_const', const='1', dest='debug',
-                       help='Enable debugging symbols')
-run.options.add_option('--enable-optimize', action='store_const', const='1', dest='opt',
-                       help='Enable optimization')
-run.Configure(sys.path[0])
+parser = run.BuildParser(sourcePath = sys.path[0], api='2.2')
+parser.options.add_argument('--sm-path', type=str, dest='sm_path', default=None,
+                        help='Path to SourceMod')
+parser.options.add_argument('--enable-debug', action='store_const', const='1', dest='debug',
+                        help='Enable debugging symbols')
+parser.options.add_argument('--enable-optimize', action='store_const', const='1', dest='opt',
+                        help='Enable optimization')
+parser.options.add_argument('--disable-auto-versioning', action='store_false', dest='disable_auto_versioning',
+                        default=True, help='Disables the auto versioning script')
+parser.options.add_argument('--targets', type=str, dest='targets', default=None,
+		                help="Override the target architecture (use commas to separate multiple targets).")
+parser.Configure()

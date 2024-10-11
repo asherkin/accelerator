@@ -1,96 +1,58 @@
 # vim: set ts=2 sw=2 tw=99 noet ft=python:
-import os
-import ambuild.osutil as osutil
-from ambuild.command import SymlinkCommand
-from ambuild.command import ShellCommand
-from ambuild.command import DirectCommand
+import os, sys
 
-def BuildEverything():
-	if AMBuild.target['platform'] not in ['linux', 'windows']:
-		return
+builder.SetBuildFolder('/')
 
-	compiler = SM.DefaultCompiler()
+project = builder.LibraryProject('accelerator.ext')
+project.sources = [
+  'extension.cpp',
+  'MemoryDownloader.cpp',
+  os.path.join(Accelerator.sm_root, 'public', 'smsdk_ext.cpp')
+]
 
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'extension'))
+def AddSourceFilesFromDir(path, files):
+  list = []
+  for file in files:
+    list.append(os.path.join(path, file))
+  return list
 
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD'], 'public'))
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD'], 'public', 'extensions'))
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.cache['SOURCEMOD'], 'sourcepawn', 'include'))
+for cxx in Accelerator.targets:
+  binary = Accelerator.ConfigureExtension(project, cxx, builder)
+  compiler = binary.compiler
+  # Wait for breakpad to be patched
+  compiler.sourcedeps += Accelerator.breakpad_patch
+  # We depend on breakpad on config
+  compiler.sourcedeps += Accelerator.breakpad_config[compiler.target.arch]
 
-	if AMBuild.target['platform'] in ['linux']:
-		compiler['POSTLINKFLAGS'].append('-lm')
-		compiler['POSTLINKFLAGS'].append('-lstdc++')
-		compiler['POSTLINKFLAGS'].append('-pthread')
+  compiler.defines += ['HAVE_CONFIG_H']
+  compiler.cxxincludes += [
+    os.path.join(builder.sourcePath, 'third_party', 'breakpad', 'src'),
+    os.path.join(builder.buildPath, 'third_party', 'config', compiler.target.arch),
+  ]
 
-		compiler['CDEFINES'].append('HAVE_CONFIG_H')
-		compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'build', 'src'))
-
-	compiler['CXXINCLUDES'].append(os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src'))
-
-	name = 'accelerator.ext'
-	extension = AMBuild.AddJob(name)
-	binary = Cpp.LibraryBuilder(name, AMBuild, extension, compiler)
-
-	binary.AddSourceFiles('extension', [
-		'extension.cpp',
-		'MemoryDownloader.cpp',
-	])
-
-	binary.AddSourceFiles(AMBuild.cache['SOURCEMOD'], ['public/smsdk_ext.cpp'])
-
-	if AMBuild.target['platform'] in ['linux']:
-		binary.AddSourceFiles(os.path.join('breakpad', 'src', 'src', 'common'), [
-			'dwarf_cfi_to_module.cc',
-			'dwarf_cu_to_module.cc',
-			'dwarf_line_to_module.cc',
-			'dwarf_range_list_handler.cc',
-			'language.cc',
-			'module.cc',
-			'path_helper.cc',
-			'stabs_reader.cc',
-			'stabs_to_module.cc',
-			'dwarf/bytereader.cc',
-			'dwarf/dwarf2diehandler.cc',
-			'dwarf/dwarf2reader.cc',
-			'dwarf/elf_reader.cc',
-			'linux/crc32.cc',
-			'linux/dump_symbols.cc',
-			'linux/elf_symbols_to_module.cc',
+  if compiler.target.platform in ['linux']:
+    binary.sources += AddSourceFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'third_party', 'breakpad', 'src', 'common'), [
+      'dwarf_cfi_to_module.cc',
+      'dwarf_cu_to_module.cc',
+      'dwarf_line_to_module.cc',
+      'dwarf_range_list_handler.cc',
+      'language.cc',
+      'module.cc',
+      'path_helper.cc',
+      'stabs_reader.cc',
+      'stabs_to_module.cc',
+      'dwarf/bytereader.cc',
+      'dwarf/dwarf2diehandler.cc',
+      'dwarf/dwarf2reader.cc',
+      'dwarf/elf_reader.cc',
+      'linux/crc32.cc',
+      'linux/dump_symbols.cc',
+      'linux/elf_symbols_to_module.cc',
+      'linux/breakpad_getcontext.S'
 		])
 
-	if AMBuild.target['platform'] in ['linux']:
-		libs = [
-			('libbreakpad_client.a', os.path.join('breakpad', 'build', 'src', 'client', 'linux', 'libbreakpad_client.a')),
-			('libbreakpad.a', os.path.join('breakpad', 'build', 'src', 'libbreakpad.a')),
-			('libdisasm.a', os.path.join('breakpad', 'build', 'src', 'third_party', 'libdisasm', 'libdisasm.a')),
-		]
+  Accelerator.link_libbreakpad_client(compiler, builder)
+  Accelerator.link_libbreakpad(compiler, builder)
+  Accelerator.link_libdisasm(compiler, builder)
 
-		for lib, target in libs:
-			link = os.path.join(AMBuild.outputFolder, extension.workFolder, lib)
-			target = os.path.join(AMBuild.sourceFolder, target)
-			try:
-				os.lstat(link)
-			except:
-				extension.AddCommand(SymlinkCommand(link, target))
-			binary.AddObjectFiles([lib])
-
-	elif AMBuild.target['platform'] in ['windows']:
-		libs = [
-			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'common.lib'),
-			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'handler', 'Release', 'lib', 'exception_handler.lib'),
-			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'client', 'windows', 'crash_generation', 'Release', 'lib', 'crash_generation_client.lib'),
-			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'third_party', 'libdisasm', 'Release', 'lib', 'libdisasm.lib'),
-			os.path.join(AMBuild.sourceFolder, 'breakpad', 'src', 'src', 'processor', 'Release', 'lib', 'processor.lib'),
-		]
-
-		for path in libs:
-			if os.path.isfile(path):
-				binary.RelinkIfNewer(path)
-			binary['POSTLINKFLAGS'].extend([path])
-
-	SM.AutoVersion('extension', binary)
-	SM.ExtractDebugInfo(extension, binary)
-
-	binary.SendToJob()
-
-BuildEverything()
+Accelerator.extension = builder.Add(project)
