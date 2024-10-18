@@ -39,13 +39,6 @@
 				"windows" "\x55\x8B\xEC\x83\xEC\x20\x8D\x45\xE0\x53\x57\x6A\x01\x68\x49\x03\x00\x00"
 			}
 		}
-		"Offsets"
-		{
-			"GetCmdLine"
-			{
-				"windows" "4"
-			}
-		}
 	}
 
 	"cstrike"
