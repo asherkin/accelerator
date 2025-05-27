@@ -1,127 +1,53 @@
-# vim: set ts=2 sw=2 tw=99 noet ft=python: 
+# vim: set ts=8 sts=2 sw=2 tw=99 et ft=python:
 import os
-import shutil
-import ambuild.osutil as osutil
-from ambuild.command import Command
 
-job = AMBuild.AddJob('package')
+# This is where the files will be output to
+# package is the default
+builder.SetBuildFolder('package')
 
-class DestroyPath(Command):
-	def __init__(self, folder):
-		Command.__init__(self)
-		self.folder = folder
-
-	def destroy(self, path):
-		entries = os.listdir(path)
-		for entry in entries:
-			newpath = os.path.join(path, entry)
-			if os.path.isdir(newpath):
-				self.destroy(newpath)
-				os.rmdir(newpath)
-			elif os.path.isfile(newpath):
-				os.remove(newpath)
-
-	def run(self, runner, job):
-		runner.PrintOut('rm -rf {0}/*'.format(self.folder))
-		self.destroy(self.folder)
-
-class CreateFolders(Command):
-	def __init__(self, folders):
-		Command.__init__(self)
-		self.folders = folders
-	
-	def run(self, runner, job):
-		for folder in self.folders:
-			path = os.path.join(*folder)
-			runner.PrintOut('mkdir {0}'.format(path))
-			os.makedirs(path)
-
-#Shallow folder copy
-class CopyFolder(Command):
-	def __init__(self, fromList, toList, excludes = []):
-		Command.__init__(self)
-		self.fromPath = os.path.join(AMBuild.sourceFolder, *fromList)
-		self.toPath = os.path.join(*toList) 
-		self.excludes = excludes
-	
-	def run(self, runner, job):
-		entries = os.listdir(self.fromPath)
-		for entry in entries:
-			if entry in self.excludes:
-				continue
-			path = os.path.join(self.fromPath, entry)
-			if not os.path.isfile(path):
-				continue
-			runner.PrintOut('copy {0} to {1}'.format(path, self.toPath))
-			shutil.copy(path, self.toPath)
-
-#Single file copy
-class CopyFile(Command):
-	def __init__(self, fromFile, toPath):
-		Command.__init__(self)
-		self.fromFile = fromFile
-		self.toPath = toPath
-
-	def run(self, runner, job):
-		runner.PrintOut('copy {0} to {1}'.format(self.fromFile, self.toPath))
-		shutil.copy(self.fromFile, self.toPath)
-
-
-folders = [
-	['addons', 'sourcemod', 'configs'],
-	['addons', 'sourcemod', 'gamedata'],
-	['addons', 'sourcemod', 'extensions'],
+# Add any folders you need to this list
+folder_list = [
+  'addons/sourcemod/extensions',
+  'addons/sourcemod/gamedata',
+  'addons/sourcemod/configs'
 ]
 
-#Setup
-job.AddCommand(DestroyPath(os.path.join(AMBuild.outputFolder, 'package')))
-job.AddCommand(CreateFolders(folders))
+# Are we build a x86_64 extension ?
+for task in Accelerator.extension:
+  if task.target.arch == 'x86_64':
+    folder_list += ['addons/sourcemod/extensions/x64']
+    break
 
-job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.games.txt'), os.path.join('addons', 'sourcemod', 'gamedata')))
-job.AddCommand(CopyFile(os.path.join(AMBuild.sourceFolder, 'accelerator.autoload'), os.path.join('addons', 'sourcemod', 'extensions')))
+# Create the distribution folder hierarchy.
+folder_map = {}
+for folder in folder_list:
+  norm_folder = os.path.normpath(folder)
+  folder_map[folder] = builder.AddFolder(norm_folder)
 
-bincopies = []
+# Do all straight-up file copies from the source tree.
+def CopyFiles(src, dest, files):
+  if not dest:
+    dest = src
+  dest_entry = folder_map[dest]
+  for source_file in files:
+    source_path = os.path.join(builder.sourcePath, src, source_file)
+    builder.AddCopy(source_path, dest_entry)
+def CopyFile(src, dest):
+  dest_entry = folder_map[dest]
+  source_path = os.path.join(builder.sourcePath, src)
+  builder.AddCopy(source_path, dest_entry)
+def CopyDirContent(src, dest):
+  dest_entry = folder_map[dest]
+  for item in os.scandir(os.path.join(builder.sourcePath, src)):
+    if item.is_file():
+      builder.AddCopy(item.path, dest_entry)
 
-def AddNormalLibrary(name, dest):
-	dest = os.path.join('addons', 'sourcemod', dest)
-	bincopies.append(CopyFile(os.path.join('..', name, name + osutil.SharedLibSuffix()), dest))
-	
-	# Each platform's version of dump_syms needs the path in a different format.
-	if AMBuild.target['platform'] == 'linux':
-		debug_info.append(name + '/' + name + '.so')
-	elif AMBuild.target['platform'] == 'darwin':
-		debug_info.append(name + '/' + name + '.dylib.dSYM')
-	elif AMBuild.target['platform'] == 'windows':
-		debug_info.append(name + '\\' + name + '.pdb')
+# Copy binaries.
+for task in Accelerator.extension:
+  if task.target.arch == 'x86_64':
+    builder.AddCopy(task.binary, folder_map['addons/sourcemod/extensions/x64'])
+  else:
+    builder.AddCopy(task.binary, folder_map['addons/sourcemod/extensions'])
 
-def AddExecutable(name, dest):
-	dest = os.path.join('addons', 'sourcemod', dest)
-	bincopies.append(CopyFile(os.path.join('..', name, name + osutil.ExecutableSuffix()), dest))
-	
-	# Each platform's version of dump_syms needs the path in a different format.
-	if AMBuild.target['platform'] == 'linux':
-		debug_info.append(name + '/' + name)
-	elif AMBuild.target['platform'] == 'darwin':
-		debug_info.append(name + '/' + name + '.dSYM')
-	elif AMBuild.target['platform'] == 'windows':
-		debug_info.append(name + '\\' + name + '.pdb')
-
-def AddHL2Library(name, dest):
-	for i in SM.sdkInfo:
-		sdk = SM.sdkInfo[i]
-		if AMBuild.target['platform'] not in sdk['platform']:
-			continue
-		AddNormalLibrary(name + '.ext.' + sdk['ext'], dest)
-
-debug_info = []
-
-AddNormalLibrary('accelerator.ext', 'extensions')
-AddExecutable('test-crash-dump-generation', 'configs')
-
-job.AddCommandGroup(bincopies)
-	
-pdblog = open(os.path.join(AMBuild.outputFolder, 'pdblog.txt'), 'wt')
-for pdb in debug_info:
-	pdblog.write(pdb + '\n')
-pdblog.close()
-
+CopyDirContent('gamedata', 'addons/sourcemod/gamedata')
+CopyFile('extension/accelerator.autoload', 'addons/sourcemod/extensions')
