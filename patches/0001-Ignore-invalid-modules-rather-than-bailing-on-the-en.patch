@@ -9,10 +9,10 @@ Subject: [PATCH 1/5] Ignore invalid modules rather than bailing on the entire
  1 file changed, 10 insertions(+), 3 deletions(-)
 
 diff --git a/src/processor/minidump.cc b/src/processor/minidump.cc
-index 83e5a868..a7d564f2 100644
+index 775f117c..066fd36f 100644
 --- a/src/processor/minidump.cc
 +++ b/src/processor/minidump.cc
-@@ -3195,7 +3195,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
+@@ -3198,7 +3198,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
          BPLOG(ERROR) << "MinidumpModuleList could not read required module "
                          "auxiliary data for module " <<
                          module_index << "/" << module_count;
@@ -21,7 +21,7 @@ index 83e5a868..a7d564f2 100644
        }
  
        // It is safe to use module->code_file() after successfully calling
-@@ -3207,7 +3207,14 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
+@@ -3210,7 +3210,14 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
          BPLOG(ERROR) << "MinidumpModuleList found bad base address for module "
                       << module_index << "/" << module_count << ", "
                       << module.code_file();
@@ -37,7 +37,7 @@ index 83e5a868..a7d564f2 100644
        }
  
        // Some minidumps have additional modules in the list that are duplicates.
-@@ -3234,7 +3241,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
+@@ -3237,7 +3244,7 @@ bool MinidumpModuleList::Read(uint32_t expected_size) {
                         << module_index << "/" << module_count << ", "
                         << module.code_file() << ", " << HexString(base_address)
                         << "+" << HexString(module_size);

@@ -12,18 +12,18 @@ diff --git a/src/common/linux/elf_symbols_to_module.cc b/src/common/linux/elf_sy
 index 70d50f89..f21460bf 100644
 --- a/src/common/linux/elf_symbols_to_module.cc
 +++ b/src/common/linux/elf_symbols_to_module.cc
-@@ -163,19 +163,28 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
+@@ -164,19 +164,28 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
    while(!iterator->at_end) {
      if (ELF32_ST_TYPE(iterator->info) == STT_FUNC &&
          iterator->shndx != SHN_UNDEF) {
 -      auto ext = std::make_unique<Module::Extern>(iterator->value);
 -      ext->name = SymbolString(iterator->name_offset, strings);
-+      string name = SymbolString(iterator->name_offset, strings);
++      auto name = SymbolString(iterator->name_offset, strings);
  #if !defined(__ANDROID__)  // Android NDK doesn't provide abi::__cxa_demangle.
        int status = 0;
        char* demangled =
--          abi::__cxa_demangle(ext->name.c_str(), NULL, NULL, &status);
-+          abi::__cxa_demangle(name.c_str(), NULL, NULL, &status);
+-          abi::__cxa_demangle(ext->name.c_str(), nullptr, nullptr, &status);
++          abi::__cxa_demangle(name, nullptr, nullptr, &status);
        if (demangled) {
          if (status == 0)
 -          ext->name = demangled;
