@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ 'ubuntu-22.04', 'ubuntu-latest', 'windows-2019', 'windows-latest' ]
+        os: [ 'ubuntu-22.04', 'ubuntu-latest', 'windows-latest' ]
         include:
         # we need to ship ubuntu 22.04 because of glibc reasons
           - os: ubuntu-22.04
@@ -35,11 +35,6 @@ jobs:
           - os: ubuntu-latest
             cc: clang
             cxx: clang++
-            upload: false
-            upload-artifact-name: none
-          - os: windows-2019
-            cc: msvc
-            cxx: msvc
             upload: false
             upload-artifact-name: none
           - os: windows-latest

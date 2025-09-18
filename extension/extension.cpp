@@ -558,24 +558,24 @@ class UploadThread: public IThread
 		if (log) fflush(log);
 
 		auto debugFileDir = google_breakpad::DirName(debugFile);
-		std::vector<string> debug_dirs{
+		std::vector<std::string> debug_dirs{
 			debugFileDir,
 			debugFileDir + "/.debug",
 			"/usr/lib/debug" + debugFileDir,
 		};
 
 		std::ostringstream outputStream;
-		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true, true);
+		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true, true, true);
 
 		{
 			StderrInhibitor stdrrInhibitor;
 
-			if (!WriteSymbolFile(debugFile, debugFile, "Linux", debug_dirs, options, outputStream)) {
+			if (!WriteSymbolFile(debugFile, debugFile, debugFile, "Linux", debug_dirs, options, outputStream)) {
 				outputStream.str("");
 				outputStream.clear();
 
 				// Try again without debug dirs.
-				if (!WriteSymbolFile(debugFile, debugFile, "Linux", {}, options, outputStream)) {
+				if (!WriteSymbolFile(debugFile, debugFile, debugFile, "Linux", {}, options, outputStream)) {
 					if (log) fprintf(log, "Failed to process symbol file\n");
 					if (log) fflush(log);
 					return false;
@@ -791,7 +791,7 @@ class UploadThread: public IThread
 		std::string::size_type file_start = 0;
 		if (slash != std::string::npos && (backslash == std::string::npos || slash > backslash)) {
 			file_start = slash + 1;
-		} else if (backslash != string::npos) {
+		} else if (backslash != std::string::npos) {
 			file_start = backslash + 1;
 		}
 
