@@ -1,0 +1,13 @@
+diff --git a/src/common/windows/http_upload.cc b/src/common/windows/http_upload.cc
+index bd48a233..cd12a24e 100644
+--- a/src/common/windows/http_upload.cc
++++ b/src/common/windows/http_upload.cc
+@@ -427,7 +427,7 @@ namespace {
+         return false;
+       }
+     }
+-    request_body->append("--" + boundary_str + "--\r\n");
++    request_body->append("\r\n--" + boundary_str + "--\r\n");
+     return true;
+   }
+ }
