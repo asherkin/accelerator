@@ -32,7 +32,6 @@ class AcceleratorConfig(object):
     self.libbreakpad_client = None
     self.libbreakpad = None
     self.libdisasm = None
-    self.breakpad_patch = None
     self.targets = []
     self.target_archs = set()
     self.breakpad_config = dict()
@@ -119,7 +118,7 @@ class AcceleratorConfig(object):
       '-Wno-implicit-exception-spec-mismatch'
     ]
 
-    cxx.postlink += ['-pthread', '-static-libstdc++', '-static-libgcc']
+    cxx.postlink += ['-pthread', '-Wl,-z,noexecstack']
 
     if builder.options.opt == '1':
       cxx.cflags += ['-O3']

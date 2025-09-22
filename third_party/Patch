@@ -38,7 +38,8 @@ patches = AddFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'patches
   "0002-Write-FUNC-records-instead-of-PUBLIC-for-ELF-symbols.patch",
   "0003-Support-compilation-on-VS-2015.patch",
   "0004-Fix-Linux-a-out-include.patch",
-  "0005-Add-LSS.patch"
+  "0005-Add-LSS.patch",
+  "0006-Fix-multipart-missing-CRLF.patch"
 ])
 
 # Reset the breakpad directory before applying patches
