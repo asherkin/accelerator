@@ -52,6 +52,11 @@ jobs:
           key: ${{ inputs.cache-key }}
           fail-on-cache-miss: true
           enableCrossOsArchive: true
+
+      # https://stackoverflow.com/a/64195658
+      # i hate github actions
+      - name: Add SHORT_SHA env property with commit short sha
+        run: echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
       
       - name: Linux dependencies
         if: startsWith(runner.os, 'Linux')
@@ -97,11 +102,9 @@ jobs:
           mkdir -p build && cd build
           python ../configure.py --enable-optimize
           ambuild
-          ZIP_FILENAME="${{ env.PROJECT }}-${{ github.sha }}-${{ runner.os }}.zip"
+          ZIP_FILENAME="${{ env.PROJECT }}-${SHORT_SHA}-${{ runner.os }}.zip"
           echo ${ZIP_FILENAME}
           echo "ZIP_FILENAME=${ZIP_FILENAME}" >> $GITHUB_ENV
-
-
 
       #- name: Upload package
       #  if: ${{ inputs.upload }}
@@ -110,12 +113,12 @@ jobs:
       #    name: ${{ inputs.upload-artifact-name }}
       #    path: build/package
   
-      #- name: Package release - Windows
-      #  if: startsWith(${{ inputs.os }}, 'windows-')
-      #  working-directory: extension/build/package
-      #  run: |
-      #    Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
-      #    Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
+      - name: Package release - Windows
+        if: startsWith(${{ inputs.os }}, 'windows')
+        working-directory: extension/build/package
+        run: |
+          Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
+          Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
 
       - name: Package release - Linux
         if: startsWith(${{ inputs.os }}, 'ubuntu-22.04')
@@ -128,13 +131,11 @@ jobs:
       - name: Upload release
         # if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: bash
-        # working-directory: build/package
+        working-directory: build/package
         run: |
           pwd
-          ls -la
-          ls -la ./build/package || true
-          ls ./build/package/"${{ env.ZIP_FILENAME }}" || true
-          tree -r || true
+          ls "${{ env.ZIP_FILENAME }}" || true
+
         #run: |
         #  echo "Begin upload..."
         #  AUTHORIZATION="$(echo -n '${{ secrets.USERNAME }}:${{ secrets.PASSWORD }}' | base64)"
