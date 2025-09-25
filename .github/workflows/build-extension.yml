@@ -37,6 +37,7 @@ jobs:
     env:
       SOURCEMOD: ${{ github.workspace }}/${{ inputs.cache-dir }}/sourcemod
       PROJECT: 'accelerator'
+      PROJECT_OS: ${{ inputs.os }}
       
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +108,7 @@ jobs:
           mkdir -p build && cd build
           python ../configure.py --enable-optimize
           ambuild
-          ZIP_FILENAME="${{ env.PROJECT }}-${{ env.SHORT_SHA }}-${{ runner.os }}.zip"
+          ZIP_FILENAME="${{ env.PROJECT }}-${{ env.SHORT_SHA }}-${{ env.PROJECT_OS }}.zip"
           echo ${ZIP_FILENAME}
           echo "ZIP_FILENAME=${ZIP_FILENAME}" >> $GITHUB_ENV
 
@@ -120,7 +121,7 @@ jobs:
       #    path: build/package
   
       - name: Package release - Windows
-        if: startsWith("${{ inputs.os }}", 'windows-latest')
+        if: startsWith("${{ env.PROJECT_OS }}", 'windows-latest')
         # shell: pwsh
         working-directory: extension/build/package
         run: |
@@ -128,7 +129,7 @@ jobs:
           Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
 
       - name: Package release - Linux
-        if: startsWith("${{ inputs.os }}", 'ubuntu-22.04')
+        if: startsWith("${{ env.PROJECT_OS }}", 'ubuntu-22.04')
         working-directory: build/package
         run: |
           zip -r "${{ env.ZIP_FILENAME }}" .
