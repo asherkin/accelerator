@@ -123,7 +123,11 @@ jobs:
         # if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: bash
         # working-directory: extension/build/package
-        run: tree -r
+        run: |
+          pwd
+          ls -la
+          ls -la ./build/package || true
+          tree -r
         #run: |
         #  echo "Begin upload..."
         #  AUTHORIZATION="$(echo -n '${{ secrets.USERNAME }}:${{ secrets.PASSWORD }}' | base64)"
