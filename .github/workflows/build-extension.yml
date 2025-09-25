@@ -57,7 +57,11 @@ jobs:
       # i hate github actions
       - name: Add SHORT_SHA env property with commit short sha
         shell: bash
-        run: echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
+        run: |
+          echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
+          echo ${{ inputs.os }}
+          echo ${{ env.SHORT_SHA }}
+
       
       - name: Linux dependencies
         if: startsWith(runner.os, 'Linux')
@@ -103,9 +107,10 @@ jobs:
           mkdir -p build && cd build
           python ../configure.py --enable-optimize
           ambuild
-          ZIP_FILENAME="${{ env.PROJECT }}-${SHORT_SHA}-${{ runner.os }}.zip"
+          ZIP_FILENAME="${{ env.PROJECT }}-${{ env.SHORT_SHA }}-${{ runner.os }}.zip"
           echo ${ZIP_FILENAME}
           echo "ZIP_FILENAME=${ZIP_FILENAME}" >> $GITHUB_ENV
+
 
       #- name: Upload package
       #  if: ${{ inputs.upload }}
