@@ -111,14 +111,14 @@ jobs:
       #    path: build/package
   
       #- name: Package release - Windows
-      #  if: startsWith(matrix.os, 'windows-')
+      #  if: startsWith(${{ inputs.os }}, 'windows-')
       #  working-directory: extension/build/package
       #  run: |
       #    Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
       #    Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
 
       - name: Package release - Linux
-        if: startsWith(matrix.os, 'ubuntu-22.04')
+        if: startsWith(${{ inputs.os }}, 'ubuntu-22.04')
         working-directory: build/package
         run: |
           zip -r "${{ env.ZIP_FILENAME }}" .
