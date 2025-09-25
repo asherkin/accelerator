@@ -115,6 +115,7 @@ jobs:
       #    path: build/package
   
       - name: Package release - Windows
+        shell: pwsh
         if: startsWith(${{ inputs.os }}, 'windows')
         working-directory: extension/build/package
         run: |
