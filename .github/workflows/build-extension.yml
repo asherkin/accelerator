@@ -104,25 +104,25 @@ jobs:
       #    name: ${{ inputs.upload-artifact-name }}
       #    path: build/package
   
-      - name: Package release - Windows
-        if: startsWith(matrix.os, 'windows-')
-        working-directory: extension/build/package
-        run: |
-          Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
-          Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
+      #- name: Package release - Windows
+      #  if: startsWith(matrix.os, 'windows-')
+      #  working-directory: extension/build/package
+      #  run: |
+      #    Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
+      #    Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
 
-      - name: Package release - Linux
-        if: startsWith(matrix.os, 'ubuntu-')
-        working-directory: extension/build/package
-        run: |
-          zip -r "${{ env.ZIP_FILENAME }}" .
-          cp "${{ env.ZIP_FILENAME }}" "${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}"
+      #- name: Package release - Linux
+      #  if: startsWith(matrix.os, 'ubuntu-')
+      #  working-directory: extension/build/package
+      #  run: |
+      #    zip -r "${{ env.ZIP_FILENAME }}" .
+      #   cp "${{ env.ZIP_FILENAME }}" "${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}"
 
 
       - name: Upload release
         # if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: bash
-        working-directory: extension/build/package
+        # working-directory: extension/build/package
         run: tree -r
         #run: |
         #  echo "Begin upload..."
