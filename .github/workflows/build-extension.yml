@@ -56,6 +56,7 @@ jobs:
       # https://stackoverflow.com/a/64195658
       # i hate github actions
       - name: Add SHORT_SHA env property with commit short sha
+        shell: bash
         run: echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
       
       - name: Linux dependencies
