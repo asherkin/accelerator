@@ -115,8 +115,8 @@ jobs:
       #    path: build/package
   
       - name: Package release - Windows
-        shell: pwsh
-        if: startsWith(${{ inputs.os }}, 'windows')
+        if: startsWith(${{ inputs.os }}, 'windows-latest')
+        # shell: pwsh
         working-directory: extension/build/package
         run: |
           Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
