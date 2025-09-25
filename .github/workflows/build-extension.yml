@@ -36,6 +36,8 @@ jobs:
 
     env:
       SOURCEMOD: ${{ github.workspace }}/${{ inputs.cache-dir }}/sourcemod
+      PROJECT: 'accelerator'
+      
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,6 +97,10 @@ jobs:
           mkdir -p build && cd build
           python ../configure.py --enable-optimize
           ambuild
+          ZIP_FILENAME="${{ env.PROJECT }}-${{ github.sha }}-${{ runner.os }}.zip"
+          echo ${ZIP_FILENAME}
+          echo "ZIP_FILENAME=${ZIP_FILENAME}" >> $GITHUB_ENV
+
 
 
       #- name: Upload package
@@ -111,12 +117,12 @@ jobs:
       #    Compress-Archive -Path * -Destination ${{ env.ZIP_FILENAME }}
       #    Copy-Item -Path ${{ env.ZIP_FILENAME }} -Destination ${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}
 
-      #- name: Package release - Linux
-      #  if: startsWith(matrix.os, 'ubuntu-')
-      #  working-directory: extension/build/package
-      #  run: |
-      #    zip -r "${{ env.ZIP_FILENAME }}" .
-      #   cp "${{ env.ZIP_FILENAME }}" "${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}"
+      - name: Package release - Linux
+        if: startsWith(runner.os, 'ubuntu-22.04')
+        working-directory: build/package
+        run: |
+          zip -r "${{ env.ZIP_FILENAME }}" .
+          cp "${{ env.ZIP_FILENAME }}" "${{ matrix.os }}_${{ matrix.cc }}_${{ env.ZIP_FILENAME }}"
 
 
       - name: Upload release
@@ -127,13 +133,14 @@ jobs:
           pwd
           ls -la
           ls -la ./build/package || true
+          ls "${{ env.ZIP_FILENAME }}"
           tree -r
         #run: |
         #  echo "Begin upload..."
         #  AUTHORIZATION="$(echo -n '${{ secrets.USERNAME }}:${{ secrets.PASSWORD }}' | base64)"
         #  echo "::add-mask::${AUTHORIZATION}"
         #
-        #  HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.ZIP_FILENAME }}" "https://builds.limetech.io/upload.php?project=accelerator&filename=${{ env.ZIP_FILENAME }}")
+        #  HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.ZIP_FILENAME }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.ZIP_FILENAME }}")
         #  if test ${HTTP_CODE} -ne 200; then
         #    exit ${HTTP_CODE}
         #  fi
