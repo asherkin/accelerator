@@ -146,9 +146,11 @@ jobs:
         # if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: bash
         working-directory: build/package
+        # 
+        # AUTHORIZATION="$(echo -n '${{ secrets.USERNAME }}:${{ secrets.UPLOAD_PASSWORD }}' | base64)"
         run: |
           echo "Begin upload..."
-          AUTHORIZATION="$(echo -n '${{ secrets.USERNAME }}:${{ secrets.PASSWORD }}' | base64)"
+          AUTHORIZATION="$(echo -n 'builds:${{ secrets.UPLOAD_PASSWORD }}' | base64)"
           echo "::add-mask::${AUTHORIZATION}"
         
           HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.ZIP_FILENAME }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.ZIP_FILENAME }}")
