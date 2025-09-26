@@ -111,7 +111,9 @@ jobs:
           mkdir -p build && cd build
           python ../configure.py --enable-optimize
           ambuild
-          ZIP_FILENAME="${{ env.SM_VERSION }}-${{ env.SHORT_SHA }}-${{ env.PROJECT }}_${{ env.PROJECT_OS }}.zip"
+
+          # e.g. accelerator-2.6.0-abcdefg-windows.zip          
+          ZIP_FILENAME="${{ env.PROJECT }}-${{ env.SM_VERSION }}-${{ env.SHORT_SHA }}-${{ env.PROJECT_OS }}.zip"
           echo ${ZIP_FILENAME}
           echo "ZIP_FILENAME=${ZIP_FILENAME}" >> $GITHUB_ENV
 
