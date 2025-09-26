@@ -155,7 +155,9 @@ jobs:
         
           HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.ZIP_FILENAME }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.ZIP_FILENAME }}")
           if test ${HTTP_CODE} -ne 200; then
-            exit ${HTTP_CODE}
+            echo "server returned HTTP status ${HTTP_CODE}!!"
+            exit 254
+            # we can not exit ${HTTP_CODE}, bash only goes up to a maximum of exit 255, and http has more codes than that!
           fi
           echo "Upload successful!"
 
