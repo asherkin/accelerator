@@ -36,7 +36,7 @@ jobs:
 
     env:
       SOURCEMOD: ${{ github.workspace }}/${{ inputs.cache-dir }}/sourcemod
-      PROJECT: 'accelerator'
+      PROJECT: 'test'
       PROJECT_OS: ${{ inputs.os }}
       
     steps:
