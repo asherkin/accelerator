@@ -49,7 +49,7 @@ jobs:
           REV_SHA=$(git rev-parse --short HEAD)
           cd ..
           WINDOWS_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-$REV_SHA-windows.zip"
-          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-$REV_SHA-windows.zip"
+          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-$REV_SHA-linux.zip"
           zip -r ${WINDOWS_ZIP} windows
           zip -r ${LINUX_ZIP} linux
 
