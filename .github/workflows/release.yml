@@ -45,9 +45,12 @@ jobs:
 
       - name: Zip release again
         run: |
-          read -r PRODUCT_VERSION < ./repository/product.version
-          WINDOWS_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-${{ env.RELEVANT_SHA }}-windows.zip"
-          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-${{ env.RELEVANT_SHA }}-windows.zip"
+          cd repository
+          read -r PRODUCT_VERSION < ./product.version
+          REV_COUNT=$(git rev-list --count HEAD)
+          cd ..
+          WINDOWS_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-${{ env.RELEVANT_SHA }}-windows.zip"
+          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-${{ env.RELEVANT_SHA }}-windows.zip"
           zip -r ${WINDOWS_ZIP} windows
           zip -r ${LINUX_ZIP} linux
 
