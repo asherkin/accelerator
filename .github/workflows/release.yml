@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           echo "Begin upload..."
-          AUTHORIZATION="$(echo -n 'builds:${{ secrets.PASSWORD }}' | base64)"
+          AUTHORIZATION="$(echo -n 'builds:${{ secrets.UPLOAD_PASSWORD }}' | base64)"
           echo "::add-mask::${AUTHORIZATION}"
 
           HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.WINDOWS_ZIP }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.WINDOWS_ZIP }}")

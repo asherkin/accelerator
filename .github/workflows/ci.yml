@@ -19,7 +19,6 @@ jobs:
     steps:
       - id: set
         run: |
-          echo "${{ github.event_name }}"
           echo "exclude=[${{ inputs.release && '{"runners": { "upload": false } }' || '' }}]" >> $GITHUB_OUTPUT
   
   build:
