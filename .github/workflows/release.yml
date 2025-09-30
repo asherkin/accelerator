@@ -57,7 +57,7 @@ jobs:
       - name: Upload release
         shell: bash
         run: |
-          echo "Begin upload..."
+          echo "Begin upload for branch (${{ github.ref_name }})"
           AUTHORIZATION="$(echo -n 'builds:${{ secrets.UPLOAD_PASSWORD }}' | base64)"
           echo "::add-mask::${AUTHORIZATION}"
 
