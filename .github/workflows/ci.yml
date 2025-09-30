@@ -1,54 +1,46 @@
 name: CI
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - master
-      - overhaul
-  
-  push:
-    branches:
-      - master
-      - overhaul
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        required: true
+        default: false
 
 jobs:
   cache:
     uses: ./.github/workflows/cache.yml
+
+  build-options:
+    runs-on: ubuntu-latest
+    outputs:
+      exclude: ${{ steps.set.outputs.exclude }}
+    steps:
+      - id: set
+        run: |
+          echo "exclude=[${{ inputs.release && '{"runners": { "upload": false } }' || '' }}]" >> $GITHUB_OUTPUT
   
   build:
     name: Build
-    needs: cache
+    needs: [ cache, build-options ]
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ 'ubuntu-22.04', 'ubuntu-latest', 'windows-latest' ]
-        include:
-        # we need to ship ubuntu 22.04 because of glibc reasons
-          - os: ubuntu-22.04
-            #cc: clang-8
-            #cxx: clang++-8
-            cc: clang
-            cxx: clang++
-            upload: true
-            upload-artifact-name: accelerator_linux
-          - os: ubuntu-latest
-            cc: clang
-            cxx: clang++
-            upload: false
-            upload-artifact-name: none
-          - os: windows-latest
-            cc: msvc
-            cxx: msvc
-            upload: true
-            upload-artifact-name: accelerator_windows
+        runners: [ 
+          { os: ubuntu-22.04, cc: clang, cxx: clang++, upload: true, upload-artifact-name: accelerator_linux },
+          { os: ubuntu-latest, cc: clang, cxx: clang++, upload: false },
+          { os: windows-latest, cc: msvc, cxx: msvc, upload: true, upload-artifact-name: accelerator_windows }
+        ]
+        exclude: ${{ fromJson(needs.build-options.outputs.exclude) }}
     
     uses: ./.github/workflows/build-extension.yml
     with:
-      os: ${{ matrix.os }}
-      cc: ${{ matrix.cc }}
-      cxx: ${{ matrix.cxx }}
-      upload: ${{ matrix.upload }}
-      upload-artifact-name: ${{ matrix.upload-artifact-name }}
+      os: ${{ matrix.runners.os }}
+      cc: ${{ matrix.runners.cc }}
+      cxx: ${{ matrix.runners.cxx }}
+      upload: ${{ matrix.runners.upload }}
+      upload-artifact-name: ${{ matrix.runners.upload-artifact-name }}
       cache-key: ${{ needs.cache.outputs.key }}
       cache-dir: ${{ needs.cache.outputs.dir }}
