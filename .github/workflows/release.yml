@@ -1,11 +1,9 @@
-name: Build Release
+name: Make Release
 
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ master, ci_release ]
 
 jobs:
   build-extension:
