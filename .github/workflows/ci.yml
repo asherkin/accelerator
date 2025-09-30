@@ -1,6 +1,12 @@
 name: CI
 on:
+  workflow_dispatch:
   workflow_call:
+    inputs:
+      release:
+        type: boolean
+        required: true
+        default: false
 
 jobs:
   cache:
@@ -14,7 +20,7 @@ jobs:
       - id: set
         run: |
           echo "${{ github.event_name }}"
-          echo "exclude=[${{ github.event_name == 'workflow_call' && '{"runners": { "upload": false } }' || '' }}]" >> $GITHUB_OUTPUT
+          echo "exclude=[${{ inputs.release && '{"runners": { "upload": false } }' || '' }}]" >> $GITHUB_OUTPUT
   
   build:
     name: Build
