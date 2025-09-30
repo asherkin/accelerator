@@ -1,0 +1,72 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-extension:
+    uses: ./.github/workflows/build-extension.yml
+
+  release:
+    permissions: write-all
+    runs-on: ubuntu-latest
+    needs: [ build-extension ]
+
+    env:
+      PROJECT: 'accelerator'
+      # Thanks to https://github.com/orgs/community/discussions/26325#discussioncomment-5397362
+      RELEVANT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - run: sudo apt-get install -y tree
+
+      - uses: actions/checkout@v4
+        name: Repository checkout
+        with:
+          fetch-depth: 0
+          path: repository
+      
+      - name: Download Linux release
+        uses: actions/download-artifact@v5
+        with:
+          name: accelerator_linux
+          path: linux
+
+      - name: Download Windows release
+        uses: actions/download-artifact@v5
+        with:
+          name: accelerator_windows
+          path: windows
+
+      - name: Zip release again
+        run: |
+          read -r PRODUCT_VERSION < ./repository/product.version
+          WINDOWS_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-${{ env.RELEVANT_SHA }}-windows.zip"
+          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-${{ env.RELEVANT_SHA }}-windows.zip"
+          zip -r ${WINDOWS_ZIP} windows
+          zip -r ${LINUX_ZIP} linux
+
+          echo "WINDOWS_ZIP=${WINDOWS_ZIP}" >> $GITHUB_ENV
+          echo "LINUX_ZIP=${LINUX_ZIP}" >> $GITHUB_ENV
+
+      - name: Upload release
+        shell: bash
+        run: |
+          echo "Begin upload..."
+          AUTHORIZATION="$(echo -n 'builds:${{ secrets.PASSWORD }}' | base64)"
+          echo "::add-mask::${AUTHORIZATION}"
+
+          HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.WINDOWS_ZIP }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.WINDOWS_ZIP }}")
+          if test ${HTTP_CODE} -ne 200; then
+            echo "Upload failed with HTTP Code: ${HTTP_CODE}"
+            exit 1
+          fi
+          HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.LINUX_ZIP }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.LINUX_ZIP }}")
+          if test ${HTTP_CODE} -ne 200; then
+            echo "Upload failed with HTTP Code: ${HTTP_CODE}"
+            exit 1
+          fi
+          echo "Upload successful!"
