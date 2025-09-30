@@ -3,16 +3,18 @@ name: Make Release
 on:
   workflow_dispatch:
   push:
-    branches: [ master, ci_release ]
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 jobs:
-  build-extension:
-    uses: ./.github/workflows/build-extension.yml
+  main-ci:
+    uses: ./.github/workflows/ci.yml
 
   release:
     permissions: write-all
     runs-on: ubuntu-latest
-    needs: [ build-extension ]
+    needs: [ main-ci ]
 
     env:
       PROJECT: 'accelerator'
