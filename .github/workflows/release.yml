@@ -20,8 +20,6 @@ jobs:
 
     env:
       PROJECT: 'accelerator'
-      # Thanks to https://github.com/orgs/community/discussions/26325#discussioncomment-5397362
-      RELEVANT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - run: sudo apt-get install -y tree
 
@@ -48,9 +46,10 @@ jobs:
           cd repository
           read -r PRODUCT_VERSION < ./product.version
           REV_COUNT=$(git rev-list --count HEAD)
+          REV_SHA=$(git rev-parse --short HEAD)
           cd ..
-          WINDOWS_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-${{ env.RELEVANT_SHA }}-windows.zip"
-          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-${{ env.RELEVANT_SHA }}-windows.zip"
+          WINDOWS_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-$REV_SHA-windows.zip"
+          LINUX_ZIP="${{ env.PROJECT }}-$PRODUCT_VERSION-git$REV_COUNT-$REV_SHA-windows.zip"
           zip -r ${WINDOWS_ZIP} windows
           zip -r ${LINUX_ZIP} linux
 
@@ -64,11 +63,13 @@ jobs:
           AUTHORIZATION="$(echo -n 'builds:${{ secrets.UPLOAD_PASSWORD }}' | base64)"
           echo "::add-mask::${AUTHORIZATION}"
 
+          echo "Uploading ${{ env.WINDOWS_ZIP }}"
           HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.WINDOWS_ZIP }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.WINDOWS_ZIP }}")
           if test ${HTTP_CODE} -ne 200; then
             echo "Upload failed with HTTP Code: ${HTTP_CODE}"
             exit 1
           fi
+          echo "Uploading ${{ env.LINUX_ZIP }}"
           HTTP_CODE=$(curl -XPOST -H "Authorization: Basic ${AUTHORIZATION}" -H "Content-Type: application/zip" --output /dev/null --silent --write-out "%{http_code}" --data-binary "@${{ env.LINUX_ZIP }}" "https://builds.limetech.io/upload.php?project=${{ env.PROJECT }}&filename=${{ env.LINUX_ZIP }}")
           if test ${HTTP_CODE} -ne 200; then
             echo "Upload failed with HTTP Code: ${HTTP_CODE}"
