@@ -9,7 +9,7 @@
 
 
 /**
- * Called a crash dump is uploaded.
+ * Called when a crash dump is uploaded.
  * 
  * @param index         Index of the crash.
  * @param response      HTTP response in plain text.
