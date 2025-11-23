@@ -27,6 +27,7 @@
 
 #include <IWebternet.h>
 #include "MemoryDownloader.h"
+#include "forwards.h"
 
 #if defined _LINUX
 #include "client/linux/handler/exception_handler.h"
@@ -464,6 +465,7 @@ class UploadThread: public IThread
 						count++;
 						g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
 						if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
+						extforwards::CallForward(count, response);
 					} else {
 						failed++;
 						g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
@@ -1321,6 +1323,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Accelerator::SDK_OnUnload()
 {
+	extforwards::Shutdown();
 	plsys->RemovePluginsListener(this);
 
 #if defined _LINUX
@@ -1334,6 +1337,12 @@ void Accelerator::SDK_OnUnload()
 #endif
 
 	delete handler;
+}
+
+void Accelerator::SDK_OnAllLoaded()
+{
+	extforwards::Init();
+	sharesys->RegisterLibrary(myself, "accelerator");
 }
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)

@@ -50,6 +50,11 @@ public: // SDKExtension
 	virtual void SDK_OnUnload();
 
 	/**
+	 * @brief This is called once all known extensions have been loaded.
+	 */
+	virtual void SDK_OnAllLoaded();
+
+	/**
 	 * @brief Called on server activation before plugins receive the OnServerLoad forward.
 	 * 
 	 * @param pEdictList		Edicts list.
