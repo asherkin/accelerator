@@ -3,9 +3,13 @@
 
 namespace extforwards
 {
+	// Initialize the sourcepawn forwards.
 	void Init();
+	// Shutdown the sourcepawn forwards.
 	void Shutdown();
-	void CallForward(int crashIndex, const char* response);
+	void CallOnDoneUploadingForward();
 }
+
+
 
 #endif // !_INCLUDE_FORWARDS_H_

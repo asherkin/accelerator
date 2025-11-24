@@ -10,6 +10,7 @@ folder_list = [
   'addons/sourcemod/extensions',
   'addons/sourcemod/gamedata',
   'addons/sourcemod/configs',
+  'addons/sourcemod/scripting',
   'addons/sourcemod/scripting/include',
 ]
 
@@ -44,9 +45,16 @@ def CopyDirContent(src, dest):
       builder.AddCopy(item.path, dest_entry)
 
 # Include files 
-CopyFiles('scripting', 'addons/sourcemod/scripting/include',
+CopyFiles('scripting/include', 'addons/sourcemod/scripting/include',
   [ 
     'accelerator.inc',
+  ]
+)
+
+# Example files 
+CopyFiles('scripting', 'addons/sourcemod/scripting',
+  [ 
+    'accelerator_example.sp',
   ]
 )
 

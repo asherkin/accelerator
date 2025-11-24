@@ -28,6 +28,7 @@
 #include <IWebternet.h>
 #include "MemoryDownloader.h"
 #include "forwards.h"
+#include "natives.h"
 
 #if defined _LINUX
 #include "client/linux/handler/exception_handler.h"
@@ -465,7 +466,8 @@ class UploadThread: public IThread
 						count++;
 						g_pSM->LogError(myself, "Accelerator uploaded crash dump: %s", response);
 						if (log) fprintf(log, "Uploaded crash dump: %s\n", response);
-						extforwards::CallForward(count, response);
+						UploadedCrash crash{ response };
+						g_accelerator.StoreUploadedCrash(crash);
 					} else {
 						failed++;
 						g_pSM->LogError(myself, "Accelerator failed to upload crash dump: %s", response);
@@ -497,6 +499,7 @@ class UploadThread: public IThread
 			log = nullptr;
 		}
 
+		g_accelerator.MarkAsDoneUploading();
 		rootconsole->ConsolePrint("Accelerator upload thread finished. (%d skipped, %d uploaded, %d failed)", skip, count, failed);
 	}
 
@@ -1082,6 +1085,25 @@ class UploadThread: public IThread
 	}
 } uploadThread;
 
+class SourcePawnNotifyThread : public IThread
+{
+public:
+
+	void RunThread(IThreadHandle* pHandle) {
+		for (;;) {
+			// Wait until OnMapStart is called once, this should be enough delay to make sure plugins are loaded.
+			if (g_accelerator.IsMapStarted() && g_accelerator.IsDoneUploading()) {
+				extforwards::CallOnDoneUploadingForward();
+				break;
+			}
+		}
+	}
+
+	void OnTerminate(IThreadHandle* pHandle, bool cancel) {
+	}
+
+} spNotifyThread;
+
 class VFuncEmptyClass {};
 
 const char *GetCmdLine()
@@ -1119,6 +1141,11 @@ const char *GetCmdLine()
 	return (const char *)(reinterpret_cast<VFuncEmptyClass*>(cmdline)->*u.mfpnew)();
 }
 
+Accelerator::Accelerator() :
+	m_doneuploading(false), m_maphasstarted(false)
+{
+}
+
 bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	sharesys->AddDependency(myself, "webternet.ext", true, true);
@@ -1144,6 +1171,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 
 	threader->MakeThread(&uploadThread);
+	threader->MakeThread(&spNotifyThread); // This thread waits for accelator to be done uploading and for the first OnMapStart call, then fires a SourceMod forward
 
 	do {
 		char gameconfigError[256];
@@ -1343,11 +1371,17 @@ void Accelerator::SDK_OnAllLoaded()
 {
 	extforwards::Init();
 	sharesys->RegisterLibrary(myself, "accelerator");
+
+	natives::SetupNatives(m_natives);
+	m_natives.push_back({ nullptr, nullptr }); // SM requires this to signal the end of the native info array
+
+	sharesys->AddNatives(myself, m_natives.data());
 }
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
 	strncpy(crashMap, gamehelpers->GetCurrentMap(), sizeof(crashMap) - 1);
+	m_maphasstarted.store(true);
 }
 
 /* 010 Editor Template
@@ -1507,4 +1541,26 @@ void Accelerator::OnPluginUnloaded(IPlugin *plugin)
 	}
 
 	SerializePluginContexts();
+}
+
+void Accelerator::StoreUploadedCrash(UploadedCrash& crash)
+{
+	std::lock_guard<std::mutex> lock(m_uploadedcrashes_mutex);
+	m_uploadedcrashes.push_back(std::move(crash));
+}
+
+const UploadedCrash* Accelerator::GetUploadedCrash(int element) const
+{
+	std::lock_guard<std::mutex> lock(m_uploadedcrashes_mutex);
+	if (element < 0 || element >= static_cast<int>(m_uploadedcrashes.size())) {
+		return nullptr;
+	}
+
+	return &m_uploadedcrashes[element];
+}
+
+cell_t Accelerator::GetUploadedCrashCount() const
+{
+	std::lock_guard<std::mutex> lock(m_uploadedcrashes_mutex);
+	return static_cast<cell_t>(m_uploadedcrashes.size());
 }
