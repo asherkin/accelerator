@@ -4,9 +4,6 @@
 #pragma newdecls required
 #pragma semicolon 1
 
-bool g_bLoggedCrashes = false;
-Handle g_Timer = null;
-
 public Plugin myinfo =
 {
 	name = "Accelerator Example",
@@ -20,18 +17,11 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
 	RegAdminCmd("sm_listcrashes", Command_ListCrashes, ADMFLAG_RCON, "List all uploaded crash dumps.");
-}
 
-public void OnMapStart()
-{
-	// Example of how to fetch crashes automatically. This doesn't have to be on a OnMapStart callback.
-	if (!g_bLoggedCrashes) // only log crashes once
+	// Call the forward manually. (For late loading plugins)
+	if (Accelerator_IsDoneUploadingCrashes())
 	{
-		if (g_Timer == null) // avoid creating multiple timers since this is OnMapStart
-		{
-			// Create a repeating timer that will query Accelerator and log crashes when it's done uploading.
-			g_Timer = CreateTimer(0.1, Timer_LogCrashes, .flags = TIMER_REPEAT);
-		}
+		Accelerator_OnDoneUploadingCrashes();
 	}
 }
 
@@ -83,35 +73,4 @@ Action Command_ListCrashes(int client, int args)
 	}
 
 	return Plugin_Handled;
-}
-
-Action Timer_LogCrashes(Handle timer)
-{
-	// Wait until accelerator is done.
-	if (!Accelerator_IsDoneUploadingCrashes())
-	{
-		return Plugin_Continue;
-	}
-
-	int max = Accelerator_GetUploadedCrashCount();
-
-	if (max == 0)
-	{
-		LogMessage("No crashes were uploaded!");
-		g_Timer = null;
-		g_bLoggedCrashes = true;
-		return Plugin_Stop;
-	}
-
-	char buffer[512];
-
-	for (int i = 0; i < max; i++)
-	{
-		Accelerator_GetCrashHTTPResponse(i, buffer, sizeof(buffer));
-		LogMessage("Crash #%i: HTTP reponse: \"%s\".", i, buffer);
-	}
-
-	g_Timer = null;
-	g_bLoggedCrashes = true;
-	return Plugin_Stop;
 }
