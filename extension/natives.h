@@ -4,7 +4,8 @@
 
 namespace natives
 {
-	void SetupNatives(std::vector<sp_nativeinfo_t>& vec);
+	// Called during the load process to setup the extension natives
+	void Setup(std::vector<sp_nativeinfo_t>& vec);
 }
 
 #endif // !_INCLUDE_NATIVES_H_

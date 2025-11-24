@@ -29,6 +29,8 @@ void extforwards::Shutdown()
 
 void extforwards::CallOnDoneUploadingForward()
 {
+	// It's obligatory to use AddFrameAction here because SourcePawn forwards can only be called from the server's main thread.
+	// AddFrameAction will do this for us and is also thread safe.
 	smutils->AddFrameAction(OnDoneUploadingCallback, nullptr);
 }
 

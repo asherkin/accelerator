@@ -24,10 +24,12 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
-	if (!g_bLoggedCrashes)
+	// Example of how to fetch crashes automatically. This doesn't have to be on a OnMapStart callback.
+	if (!g_bLoggedCrashes) // only log crashes once
 	{
-		if (g_Timer == null)
+		if (g_Timer == null) // avoid creating multiple timers since this is OnMapStart
 		{
+			// Create a repeating timer that will query Accelerator and log crashes when it's done uploading.
 			g_Timer = CreateTimer(0.1, Timer_LogCrashes, .flags = TIMER_REPEAT);
 		}
 	}
@@ -37,8 +39,25 @@ public void OnMapStart()
 public void Accelerator_OnDoneUploadingCrashes()
 {
 	LogMessage("Accelerator is done uploading crashes!");
+
+	int max = Accelerator_GetUploadedCrashCount();
+
+	if (max == 0)
+	{
+		LogMessage("No crashes were uploaded!");
+		return;
+	}
+
+	char buffer[512];
+
+	for (int i = 0; i < max; i++)
+	{
+		Accelerator_GetCrashHTTPResponse(i, buffer, sizeof(buffer));
+		LogMessage("Crash #%i: HTTP reponse: \"%s\".", i, buffer);
+	}
 }
 
+// Admin command to list crashes
 Action Command_ListCrashes(int client, int args)
 {
 	if (!Accelerator_IsDoneUploadingCrashes())
@@ -68,6 +87,7 @@ Action Command_ListCrashes(int client, int args)
 
 Action Timer_LogCrashes(Handle timer)
 {
+	// Wait until accelerator is done.
 	if (!Accelerator_IsDoneUploadingCrashes())
 	{
 		return Plugin_Continue;

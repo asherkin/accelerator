@@ -42,7 +42,7 @@ static cell_t Native_GetCrashHTTPResponse(IPluginContext* context, const cell_t*
 	return 0;
 }
 
-void natives::SetupNatives(std::vector<sp_nativeinfo_t>& vec)
+void natives::Setup(std::vector<sp_nativeinfo_t>& vec)
 {
 	sp_nativeinfo_t list[] = {
 		{"Accelerator_GetUploadedCrashCount", Native_GetUploadedCrashCount},
