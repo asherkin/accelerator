@@ -1372,7 +1372,7 @@ void Accelerator::SDK_OnAllLoaded()
 	extforwards::Init();
 	sharesys->RegisterLibrary(myself, "accelerator");
 
-	natives::SetupNatives(m_natives);
+	natives::Setup(m_natives);
 	m_natives.push_back({ nullptr, nullptr }); // SM requires this to signal the end of the native info array
 
 	sharesys->AddNatives(myself, m_natives.data());
