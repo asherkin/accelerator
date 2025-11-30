@@ -565,7 +565,7 @@ class UploadThread: public IThread
 		};
 
 		std::ostringstream outputStream;
-		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true, true, true);
+		google_breakpad::DumpOptions options(ALL_SYMBOL_DATA, true, true, false);
 
 		{
 			StderrInhibitor stdrrInhibitor;
