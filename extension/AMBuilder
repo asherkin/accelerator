@@ -7,6 +7,8 @@ project = builder.LibraryProject('accelerator.ext')
 project.sources = [
   'extension.cpp',
   'MemoryDownloader.cpp',
+  'forwards.cpp',
+  'natives.cpp',
   os.path.join(Accelerator.sm_root, 'public', 'smsdk_ext.cpp')
 ]
 

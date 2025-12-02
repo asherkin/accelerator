@@ -9,7 +9,9 @@ builder.SetBuildFolder('package')
 folder_list = [
   'addons/sourcemod/extensions',
   'addons/sourcemod/gamedata',
-  'addons/sourcemod/configs'
+  'addons/sourcemod/configs',
+  'addons/sourcemod/scripting',
+  'addons/sourcemod/scripting/include',
 ]
 
 # Are we build a x86_64 extension ?
@@ -41,6 +43,20 @@ def CopyDirContent(src, dest):
   for item in os.scandir(os.path.join(builder.sourcePath, src)):
     if item.is_file():
       builder.AddCopy(item.path, dest_entry)
+
+# Include files 
+CopyFiles('scripting/include', 'addons/sourcemod/scripting/include',
+  [ 
+    'accelerator.inc',
+  ]
+)
+
+# Example files 
+CopyFiles('scripting', 'addons/sourcemod/scripting',
+  [ 
+    'accelerator_example.sp',
+  ]
+)
 
 # Copy binaries.
 for task in Accelerator.extension:
