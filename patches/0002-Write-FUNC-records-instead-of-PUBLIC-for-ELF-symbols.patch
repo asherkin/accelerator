@@ -18,12 +18,12 @@ index 70d50f89..f21460bf 100644
          iterator->shndx != SHN_UNDEF) {
 -      auto ext = std::make_unique<Module::Extern>(iterator->value);
 -      ext->name = SymbolString(iterator->name_offset, strings);
-+      auto name = SymbolString(iterator->name_offset, strings);
++      std::string name = SymbolString(iterator->name_offset, strings);
  #if !defined(__ANDROID__)  // Android NDK doesn't provide abi::__cxa_demangle.
        int status = 0;
        char* demangled =
 -          abi::__cxa_demangle(ext->name.c_str(), nullptr, nullptr, &status);
-+          abi::__cxa_demangle(name, nullptr, nullptr, &status);
++          abi::__cxa_demangle(name.c_str(), nullptr, nullptr, &status);
        if (demangled) {
          if (status == 0)
 -          ext->name = demangled;
