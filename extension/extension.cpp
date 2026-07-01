@@ -1122,7 +1122,7 @@ const char *GetCmdLine()
 }
 
 Accelerator::Accelerator() :
-	m_doneuploading(false), m_maphasstarted(false), m_outter(this)
+	m_doneuploading(false), m_maphasstarted(false), m_spNotifyThread(this)
 {
 }
 
@@ -1215,6 +1215,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #endif
 
 	do {
+#if SMINTERFACE_EXTENSIONAPI_VERSION < 9
 		char spJitPath[512];
 		g_pSM->BuildPath(Path_SM, spJitPath, sizeof(spJitPath), "bin/" PLATFORM_ARCH_FOLDER "sourcepawn.jit.x86." PLATFORM_LIB_EXT);
 
@@ -1250,6 +1251,11 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		}
 
 		strncpy(crashSourceModVersion, spEngine2->GetVersionString(), sizeof(crashSourceModVersion));
+#else
+		auto engine = g_pSM->GetScriptingEngine();
+
+		strncpy(crashSourceModVersion, engine->GetVersionString(), sizeof(crashSourceModVersion));
+#endif
 	} while(false);
 
 	plsys->AddPluginsListener(this);
@@ -1465,6 +1471,7 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 	size += sizeof(void *); // GetBaseContext
 	size += filenameSize;
 
+#if SMINTERFACE_EXTENSIONAPI_VERSION < 9
 	uint32_t count = runtime->GetPublicsNum();
 	size += sizeof(uint32_t); // count
 	size += count * sizeof(uint32_t); // pubinfo->code_offs
@@ -1475,6 +1482,23 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 
 		size += strlen(pubinfo->name) + 1;
 	}
+#else
+static_assert(false, "Check the code below is still true.");
+static_assert(sizeof(funcid_t) == 4, "funcid_t is no longer 4 bytes long.");
+
+	// The count has to be discovered
+	uint32_t count = 0;
+	for (; count < ~(1 << 31); ++count) {
+		auto func_id = (count << 1) | 0x1;
+		auto func = runtime->GetFunctionById(func_id);
+		if (!func) {
+			break;
+		}
+		size += strlen(func->DebugName()) + 1;
+	}
+	size += sizeof(uint32_t);
+	size += count * sizeof(uint32_t);
+#endif
 
 	unsigned char *buffer = (unsigned char *)malloc(size);
 	unsigned char *cursor = buffer;
@@ -1492,6 +1516,7 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 	cursor += sizeof(uint32_t);
 
 	for (uint32_t i = 0; i < count; ++i) {
+#if SMINTERFACE_EXTENSIONAPI_VERSION < 9
 		sp_public_t *pubinfo;
 		runtime->GetPublicByIndex(i, &pubinfo);
 
@@ -1501,6 +1526,18 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 		size_t nameSize = strlen(pubinfo->name) + 1;
 		memcpy(cursor, pubinfo->name, nameSize);
 		cursor += nameSize;
+#else
+		auto func_id = (i << 1) | 0x1;
+		auto func = runtime->GetFunctionById(func_id);
+
+		// This information is no longer public
+		*(uint32_t*)cursor = 0x0;
+		cursor += sizeof(uint32_t);
+
+		size_t nameSize = strlen(func->DebugName()) + 1;
+		memcpy(cursor, func->DebugName(), nameSize);
+		cursor += nameSize;
+#endif
 	}
 
 	pluginContextMap[context] = buffer;
