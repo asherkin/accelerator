@@ -4,15 +4,15 @@ Date: Sun, 13 Jan 2019 12:35:05 +0000
 Subject: [PATCH 2/5] Write FUNC records instead of PUBLIC for ELF symbols with
  sizes
  ---
- src/common/linux/elf_symbols_to_module.cc | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ src/common/linux/elf_symbols_to_module.cc | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
 
 diff --git a/src/common/linux/elf_symbols_to_module.cc b/src/common/linux/elf_symbols_to_module.cc
-index 70d50f89..f21460bf 100644
+index 2e5c4eeb..60e2e4d7 100644
 --- a/src/common/linux/elf_symbols_to_module.cc
 +++ b/src/common/linux/elf_symbols_to_module.cc
-@@ -164,19 +164,28 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
+@@ -164,19 +164,26 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
    while(!iterator->at_end) {
      if (ELF32_ST_TYPE(iterator->info) == STT_FUNC &&
          iterator->shndx != SHN_UNDEF) {
@@ -31,17 +31,16 @@ index 70d50f89..f21460bf 100644
          free(demangled);
        }
  #endif
-+#if 1
+-      module->AddExtern(std::move(ext));
 +      if (iterator->size) {
 +        Module::Function *fun = new Module::Function(module->AddStringToPool(name), iterator->value);
 +        fun->ranges.push_back(Module::Range(iterator->value, iterator->size));
 +        module->AddFunction(fun);
++      } else {
++        auto ext = std::make_unique<Module::Extern>(iterator->value);
++        ext->name = name;
++        module->AddExtern(std::move(ext));
 +      }
-+#else
-+      Module::Extern *ext = new Module::Extern(iterator->value);
-+      ext->name = name;
-       module->AddExtern(std::move(ext));
-+#endif
      }
      ++iterator;
    }
