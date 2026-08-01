@@ -8,5 +8,3 @@ on:
 jobs:
   main-ci:
     uses: ./.github/workflows/ci.yml
-    with:
-      release: false
