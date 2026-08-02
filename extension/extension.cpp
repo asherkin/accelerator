@@ -1089,34 +1089,16 @@ class UploadThread: public IThread
 	}
 } uploadThread;
 
-class SourcePawnNotifyThread : public IThread
+void Accelerator::NotifyIfDoneUploading()
 {
-	std::atomic_bool m_shutdown{false};
-
-public:
-
-	void RunThread(IThreadHandle* pHandle) {
-		while (!m_shutdown.load()) {
-			// Wait until OnMapStart is called once, this should be enough delay to make sure plugins are loaded.
-			if (g_accelerator.IsMapStarted() && g_accelerator.IsDoneUploading()) {
-				extforwards::CallOnDoneUploadingForward();
-				break;
-			}
-
-			threader->ThreadSleep(100);
-		}
+	if (!IsMapStarted() || !IsDoneUploading()) {
+		return;
 	}
 
-	void OnTerminate(IThreadHandle* pHandle, bool cancel) {
+	if (!m_notified.exchange(true)) {
+		extforwards::CallOnDoneUploadingForward();
 	}
-
-	void Shutdown() {
-		m_shutdown.store(true);
-	}
-
-} spNotifyThread;
-
-IThreadHandle *spNotifyThreadHandle = NULL;
+}
 
 class VFuncEmptyClass {};
 
@@ -1156,7 +1138,7 @@ const char *GetCmdLine()
 }
 
 Accelerator::Accelerator() :
-	m_doneuploading(false), m_maphasstarted(false)
+	m_doneuploading(false), m_maphasstarted(false), m_notified(false)
 {
 }
 
@@ -1185,7 +1167,6 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 
 	threader->MakeThread(&uploadThread);
-	spNotifyThreadHandle = threader->MakeThread(&spNotifyThread, Thread_Default); // This thread waits for accelator to be done uploading and for the first OnMapStart call, then fires a SourceMod forward.
 
 	do {
 		char gameconfigError[256];
@@ -1368,13 +1349,6 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Accelerator::SDK_OnUnload()
 {
-	spNotifyThread.Shutdown();
-	if (spNotifyThreadHandle) {
-		spNotifyThreadHandle->WaitForThread();
-		spNotifyThreadHandle->DestroyThis();
-		spNotifyThreadHandle = NULL;
-	}
-
 	extforwards::Shutdown();
 	plsys->RemovePluginsListener(this);
 
@@ -1400,12 +1374,16 @@ void Accelerator::SDK_OnAllLoaded()
 	m_natives.push_back({ nullptr, nullptr }); // SM requires this to signal the end of the native info array
 
 	sharesys->AddNatives(myself, m_natives.data());
+
+	NotifyIfDoneUploading();
 }
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
 	strncpy(crashMap, gamehelpers->GetCurrentMap(), sizeof(crashMap) - 1);
 	m_maphasstarted.store(true);
+
+	NotifyIfDoneUploading();
 }
 
 /* 010 Editor Template
