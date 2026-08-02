@@ -1091,22 +1091,32 @@ class UploadThread: public IThread
 
 class SourcePawnNotifyThread : public IThread
 {
+	std::atomic_bool m_shutdown{false};
+
 public:
 
 	void RunThread(IThreadHandle* pHandle) {
-		for (;;) {
+		while (!m_shutdown.load()) {
 			// Wait until OnMapStart is called once, this should be enough delay to make sure plugins are loaded.
 			if (g_accelerator.IsMapStarted() && g_accelerator.IsDoneUploading()) {
 				extforwards::CallOnDoneUploadingForward();
 				break;
 			}
+
+			threader->ThreadSleep(100);
 		}
 	}
 
 	void OnTerminate(IThreadHandle* pHandle, bool cancel) {
 	}
 
+	void Shutdown() {
+		m_shutdown.store(true);
+	}
+
 } spNotifyThread;
+
+IThreadHandle *spNotifyThreadHandle = NULL;
 
 class VFuncEmptyClass {};
 
@@ -1175,7 +1185,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 
 	threader->MakeThread(&uploadThread);
-	threader->MakeThread(&spNotifyThread); // This thread waits for accelator to be done uploading and for the first OnMapStart call, then fires a SourceMod forward
+	spNotifyThreadHandle = threader->MakeThread(&spNotifyThread, Thread_Default); // This thread waits for accelator to be done uploading and for the first OnMapStart call, then fires a SourceMod forward.
 
 	do {
 		char gameconfigError[256];
@@ -1358,6 +1368,13 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Accelerator::SDK_OnUnload()
 {
+	spNotifyThread.Shutdown();
+	if (spNotifyThreadHandle) {
+		spNotifyThreadHandle->WaitForThread();
+		spNotifyThreadHandle->DestroyThis();
+		spNotifyThreadHandle = NULL;
+	}
+
 	extforwards::Shutdown();
 	plsys->RemovePluginsListener(this);
 
