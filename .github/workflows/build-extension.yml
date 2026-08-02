@@ -76,6 +76,7 @@ jobs:
           ${{ inputs.cxx }} --version
 
       - name: Install AMBuild
+        if: ${{ inputs.container == '' }}
         shell: bash
         run: |
           python3 -m pip install --upgrade pip setuptools wheel

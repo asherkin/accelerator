@@ -1,18 +1,18 @@
 From 8aaf6e84a6704eb538f68a3e6fb6c3a8c93f1d8d Mon Sep 17 00:00:00 2001
 From: Asher Baker <asherkin@limetech.io>
 Date: Sun, 13 Jan 2019 12:35:05 +0000
-Subject: [PATCH 2/5] Write FUNC records instead of PUBLIC for ELF symbols with
+Subject: [PATCH 2/2] Write FUNC records instead of PUBLIC for ELF symbols with
  sizes
- ---
- src/common/linux/elf_symbols_to_module.cc | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
 
+---
+ src/common/linux/elf_symbols_to_module.cc | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
 diff --git a/src/common/linux/elf_symbols_to_module.cc b/src/common/linux/elf_symbols_to_module.cc
-index 2e5c4eeb..60e2e4d7 100644
+index 2e5c4eeb..2a409bb5 100644
 --- a/src/common/linux/elf_symbols_to_module.cc
 +++ b/src/common/linux/elf_symbols_to_module.cc
-@@ -164,19 +164,26 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
+@@ -164,19 +164,28 @@ bool ELFSymbolsToModule(const uint8_t* symtab_section,
    while(!iterator->at_end) {
      if (ELF32_ST_TYPE(iterator->info) == STT_FUNC &&
          iterator->shndx != SHN_UNDEF) {
@@ -35,7 +35,9 @@ index 2e5c4eeb..60e2e4d7 100644
 +      if (iterator->size) {
 +        Module::Function *fun = new Module::Function(module->AddStringToPool(name), iterator->value);
 +        fun->ranges.push_back(Module::Range(iterator->value, iterator->size));
-+        module->AddFunction(fun);
++        if (!module->AddFunction(fun)) {
++          delete fun;
++        }
 +      } else {
 +        auto ext = std::make_unique<Module::Extern>(iterator->value);
 +        ext->name = name;

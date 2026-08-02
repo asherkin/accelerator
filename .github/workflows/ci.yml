@@ -40,12 +40,10 @@ jobs:
             cc: clang-22
             cxx: clang++-22
             container: 'ghcr.io/alliedmodders/build-containers/debian11-clang22:latest'
-            artifact: accelerator_sm113_linux
           - os: windows-latest
             cc: msvc
             cxx: msvc
             container: ''
-            artifact: accelerator_sm113_windows
     uses: ./.github/workflows/build-extension.yml
     with:
       os: ${{ matrix.os }}
@@ -53,5 +51,3 @@ jobs:
       cxx: ${{ matrix.cxx }}
       container: ${{ matrix.container }}
       sourcemod-branch: 'master'
-      upload: true
-      upload-artifact-name: ${{ matrix.artifact }}
