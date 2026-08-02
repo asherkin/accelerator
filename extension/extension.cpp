@@ -1230,7 +1230,8 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #endif
 
 #if SMINTERFACE_EXTENSIONAPI_VERSION < 9
-	// 1.13 removed ISourcePawnEngine2, which owned GetVersionString.
+	// 1.13 links the SourcePawn VM into sourcemod.logic and dropped ISourcePawnFactory,
+	// so there is no sourcepawn.jit library left to load here.
 	do {
 		char spJitPath[512];
 		g_pSM->BuildPath(Path_SM, spJitPath, sizeof(spJitPath), "bin/" PLATFORM_ARCH_FOLDER "sourcepawn.jit.x86." PLATFORM_LIB_EXT);
