@@ -28,13 +28,13 @@ jobs:
       - name: Download Linux release
         uses: actions/download-artifact@v8
         with:
-          name: accelerator_sm112_linux
+          name: accelerator_linux
           path: linux
 
       - name: Download Windows release
         uses: actions/download-artifact@v8
         with:
-          name: accelerator_sm112_windows
+          name: accelerator_windows
           path: windows
 
       - name: Zip release again
@@ -75,12 +75,14 @@ jobs:
           echo "Upload successful!"
 
       - name: Upload Windows artifact
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           path: ${{ env.WINDOWS_ZIP }}
           archive: false
 
       - name: Upload Linux artifact
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           path: ${{ env.LINUX_ZIP }}

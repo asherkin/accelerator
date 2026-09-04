@@ -14,12 +14,12 @@ jobs:
             cc: clang-22
             cxx: clang++-22
             container: 'ghcr.io/alliedmodders/build-containers/debian11-clang22:latest'
-            artifact: accelerator_sm112_linux
+            artifact: accelerator_linux
           - os: windows-latest
             cc: msvc
             cxx: msvc
             container: ''
-            artifact: accelerator_sm112_windows
+            artifact: accelerator_windows
     uses: ./.github/workflows/build-extension.yml
     with:
       os: ${{ matrix.os }}
