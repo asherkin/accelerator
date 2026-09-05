@@ -10,9 +10,15 @@ on:
         required: true
       cxx:
         type: string
+      cache-key:
+        type: string
+        required: false
+      cache-dir:
+        type: string
+        required: false
       sourcemod-branch:
         type: string
-        required: true
+        required: false
       upload:
         type: boolean
         required: false
@@ -35,24 +41,14 @@ jobs:
     runs-on: ${{ inputs.os }}
     container: ${{ inputs.container }}
 
+    env:
+      CACHE_KEY: ${{ inputs.cache-key }}
+      CACHE_DIR: ${{ inputs.cache-dir }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
-
-      - name: SourceMod checkout
-        uses: actions/checkout@v7
-        with:
-          repository: alliedmodders/sourcemod
-          ref: ${{ inputs.sourcemod-branch }}
-          submodules: recursive
-          path: sourcemod
-          fetch-depth: 1
-
-      - name: Resolve SourceMod path
-        shell: bash
-        run: echo "SOURCEMOD=$GITHUB_WORKSPACE/sourcemod" >> $GITHUB_ENV
 
       - name: Linux dependencies
         if: startsWith(runner.os, 'Linux')
@@ -64,7 +60,7 @@ jobs:
             gcc-multilib g++-multilib libstdc++6 lib32stdc++6 \
             libc6-dev libc6-dev-i386 linux-libc-dev \
             linux-libc-dev:i386 lib32z1-dev \
-            zlib1g-dev:i386 zlib1g-dev
+            zlib1g-dev:i386 zlib1g-dev zstd
 
       - name: Select compiler
         if: startsWith(runner.os, 'Linux')
@@ -75,12 +71,51 @@ jobs:
           ${{ inputs.cc }} --version
           ${{ inputs.cxx }} --version
 
-      - name: Install AMBuild
-        if: ${{ inputs.container == '' }}
+      - name: Retrieve the cache
+        if: ${{ inputs.cache-key != '' }}
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ inputs.cache-dir }}
+          key: ${{ inputs.cache-key }}
+          fail-on-cache-miss: true
+          enableCrossOsArchive: true
+
+      - name: SourceMod checkout
+        if: ${{ inputs.cache-key == '' && inputs.sourcemod-branch != '' }}
+        uses: actions/checkout@v7
+        with:
+          repository: alliedmodders/sourcemod
+          ref: ${{ inputs.sourcemod-branch }}
+          submodules: recursive
+          path: sourcemod
+          fetch-depth: 1
+
+      - name: Resolve SourceMod path
         shell: bash
         run: |
-          python3 -m pip install --upgrade pip setuptools wheel
-          python3 -m pip install git+https://github.com/alliedmodders/ambuild
+          if [ -n "$CACHE_KEY" ]; then
+            SOURCEMOD="$GITHUB_WORKSPACE/$CACHE_DIR/sourcemod"
+          else
+            SOURCEMOD="$GITHUB_WORKSPACE/sourcemod"
+          fi
+          if [ ! -d "$SOURCEMOD" ]; then
+            echo "::error::SourceMod not found at $SOURCEMOD, pass either cache-key/cache-dir or sourcemod-branch"
+            exit 1
+          fi
+          echo "SOURCEMOD=$SOURCEMOD" >> $GITHUB_ENV
+
+      - name: Install AMBuild
+        if: ${{ inputs.cache-key != '' || inputs.container == '' }}
+        shell: bash
+        run: |
+          if [ -z "${{ inputs.container }}" ]; then
+            python3 -m pip install --upgrade pip setuptools wheel
+          fi
+          if [ -n "$CACHE_KEY" ]; then
+            python3 -m pip install --force-reinstall --no-deps "./$CACHE_DIR/ambuild"
+          else
+            python3 -m pip install git+https://github.com/alliedmodders/ambuild
+          fi
 
       - name: Build
         shell: bash

@@ -4,8 +4,12 @@ on:
   workflow_call:
 
 jobs:
+  cache:
+    uses: ./.github/workflows/cache.yml
+
   sm112:
     name: SM 1.12
+    needs: [ cache ]
     strategy:
       fail-fast: false
       matrix:
@@ -26,7 +30,8 @@ jobs:
       cc: ${{ matrix.cc }}
       cxx: ${{ matrix.cxx }}
       container: ${{ matrix.container }}
-      sourcemod-branch: '1.12-dev'
+      cache-key: ${{ needs.cache.outputs.key }}
+      cache-dir: ${{ needs.cache.outputs.dir }}
       upload: true
       upload-artifact-name: ${{ matrix.artifact }}
 
