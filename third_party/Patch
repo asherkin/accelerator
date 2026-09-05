@@ -35,7 +35,8 @@ def AddCwdCommand(context, cwd, inputs,
 git_dir = Normalize(os.path.join(builder.currentSourcePath, 'breakpad'))
 patches = AddFilesFromDir(os.path.join(builder.currentSourcePath, '..', 'patches'), [
   "0001-Ignore-invalid-modules-rather-than-bailing-on-the-en.patch",
-  "0002-Write-FUNC-records-instead-of-PUBLIC-for-ELF-symbols.patch"
+  "0002-Write-FUNC-records-instead-of-PUBLIC-for-ELF-symbols.patch",
+  "0003-Include-the-kernel-s-a.out.h-instead-of-glibc-s.patch"
 ])
 
 # Reset the breakpad directory before applying patches

@@ -1,7 +1,7 @@
 From 8aaf6e84a6704eb538f68a3e6fb6c3a8c93f1d8d Mon Sep 17 00:00:00 2001
 From: Asher Baker <asherkin@limetech.io>
 Date: Sun, 13 Jan 2019 12:35:05 +0000
-Subject: [PATCH 2/2] Write FUNC records instead of PUBLIC for ELF symbols with
+Subject: [PATCH 2/3] Write FUNC records instead of PUBLIC for ELF symbols with
  sizes
 
 ---

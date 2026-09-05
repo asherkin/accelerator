@@ -56,11 +56,8 @@ jobs:
         run: |
           dpkg --add-architecture i386
           apt-get update
-          apt-get install -y --no-install-recommends \
-            gcc-multilib g++-multilib libstdc++6 lib32stdc++6 \
-            libc6-dev libc6-dev-i386 linux-libc-dev \
-            linux-libc-dev:i386 lib32z1-dev \
-            zlib1g-dev:i386 zlib1g-dev zstd
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --allow-downgrades \
+            linux-libc-dev/bullseye linux-libc-dev:i386/bullseye zstd
 
       - name: Select compiler
         if: startsWith(runner.os, 'Linux')
