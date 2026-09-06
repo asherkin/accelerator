@@ -10,6 +10,15 @@ on:
         required: true
       cxx:
         type: string
+      cache-key:
+        type: string
+        required: false
+      cache-dir:
+        type: string
+        required: false
+      sourcemod-branch:
+        type: string
+        required: false
       upload:
         type: boolean
         required: false
@@ -22,81 +31,99 @@ on:
         type: boolean
         required: false
         default: false
-      cache-key:
+      container:
         type: string
-        required: true
-      cache-dir:
-        type: string
-        required: true
+        required: false
 
 jobs:
   build:
-    name: Accelerator Extension ${{ inputs.os }}-${{ inputs.cc }}
+    name: ${{ inputs.os }}-${{ inputs.cc }}
     runs-on: ${{ inputs.os }}
+    container: ${{ inputs.container }}
 
     env:
-      SOURCEMOD: ${{ github.workspace }}/${{ inputs.cache-dir }}/sourcemod
+      CACHE_KEY: ${{ inputs.cache-key }}
+      CACHE_DIR: ${{ inputs.cache-dir }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          submodules: true
+          submodules: recursive
 
-      - name: Retrieve the cache
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ inputs.cache-dir }}
-          key: ${{ inputs.cache-key }}
-          fail-on-cache-miss: true
-          enableCrossOsArchive: true
-      
       - name: Linux dependencies
         if: startsWith(runner.os, 'Linux')
+        shell: bash
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            gcc-multilib g++-multilib libstdc++6 lib32stdc++6 \
-            libc6-dev libc6-dev-i386 linux-libc-dev \
-            linux-libc-dev:i386 lib32z1-dev \
-            zlib1g-dev:i386 zlib1g-dev ${{ inputs.cc }}
+          dpkg --add-architecture i386
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --allow-downgrades \
+            linux-libc-dev/bullseye linux-libc-dev:i386/bullseye zstd
 
-      - name: Select clang compiler
+      - name: Select compiler
         if: startsWith(runner.os, 'Linux')
+        shell: bash
         run: |
           echo "CC=${{ inputs.cc }}" >> $GITHUB_ENV
           echo "CXX=${{ inputs.cxx }}" >> $GITHUB_ENV
           ${{ inputs.cc }} --version
           ${{ inputs.cxx }} --version
 
-      - uses: actions/setup-python@v5
-        name: Setup Python 3.10
+      - name: Retrieve the cache
+        if: ${{ inputs.cache-key != '' }}
+        uses: actions/cache/restore@v6
         with:
-          python-version: '3.10'
+          path: ${{ inputs.cache-dir }}
+          key: ${{ inputs.cache-key }}
+          fail-on-cache-miss: true
+          enableCrossOsArchive: true
+
+      - name: SourceMod checkout
+        if: ${{ inputs.cache-key == '' && inputs.sourcemod-branch != '' }}
+        uses: actions/checkout@v7
+        with:
+          repository: alliedmodders/sourcemod
+          ref: ${{ inputs.sourcemod-branch }}
+          submodules: recursive
+          path: sourcemod
+          fetch-depth: 1
+
+      - name: Resolve SourceMod path
+        shell: bash
+        run: |
+          if [ -n "$CACHE_KEY" ]; then
+            SOURCEMOD="$GITHUB_WORKSPACE/$CACHE_DIR/sourcemod"
+          else
+            SOURCEMOD="$GITHUB_WORKSPACE/sourcemod"
+          fi
+          if [ ! -d "$SOURCEMOD" ]; then
+            echo "::error::SourceMod not found at $SOURCEMOD, pass either cache-key/cache-dir or sourcemod-branch"
+            exit 1
+          fi
+          echo "SOURCEMOD=$SOURCEMOD" >> $GITHUB_ENV
 
       - name: Install AMBuild
+        if: ${{ inputs.cache-key != '' || inputs.container == '' }}
+        shell: bash
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install ./${{ inputs.cache-dir }}/ambuild
+          if [ -z "${{ inputs.container }}" ]; then
+            python3 -m pip install --upgrade pip setuptools wheel
+          fi
+          if [ -n "$CACHE_KEY" ]; then
+            python3 -m pip install --force-reinstall --no-deps "./$CACHE_DIR/ambuild"
+          else
+            python3 -m pip install git+https://github.com/alliedmodders/ambuild
+          fi
 
-      - name: Build (Debug)
-        if: ${{ inputs.debug }}
+      - name: Build
+        shell: bash
         run: |
           mkdir -p build && cd build
-          python ../configure.py --enable-debug
-          ambuild
-
-      - name: Build (Release)
-        if: not ${{ inputs.debug }}
-        run: |
-          mkdir -p build && cd build
-          python ../configure.py --enable-optimize
+          python3 ../configure.py ${{ inputs.debug && '--enable-debug' || '--enable-optimize' }}
           ambuild
 
       - name: Upload package
         if: ${{ inputs.upload }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.upload-artifact-name }}
           path: build/package

@@ -111,7 +111,7 @@ class AcceleratorConfig(object):
     ]
 
     cxx.cxxflags += [
-      '-std=c++17',
+      '-std=c++20',
       '-fno-threadsafe-statics',
       '-Wno-non-virtual-dtor',
       '-Wno-overloaded-virtual',
@@ -128,7 +128,7 @@ class AcceleratorConfig(object):
 
     cxx.cxxflags += [
       '/EHsc',
-      '/std:c++17'
+      '/std:c++20'
     ]
 
     return
@@ -158,7 +158,9 @@ class AcceleratorConfig(object):
       os.path.join(self.sm_root, 'public', 'extensions'),
       os.path.join(self.sm_root, 'public', 'amtl', 'amtl'),
       os.path.join(self.sm_root, 'public', 'amtl'),
-      os.path.join(self.sm_root, 'sourcepawn', 'include')
+      os.path.join(self.sm_root, 'sourcepawn', 'include'),
+      os.path.join(self.sm_root, 'sourcepawn', 'vm'),
+      os.path.join(self.sm_root, 'sourcepawn')
     ]
 
   def link_libz(self, compiler, context):

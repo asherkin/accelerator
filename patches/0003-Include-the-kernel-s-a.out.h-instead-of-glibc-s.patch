@@ -1,0 +1,21 @@
+From: Mikusch <25514044+Mikusch@users.noreply.github.com>
+Date: Sat, 5 Sep 2026 23:41:05 +0200
+Subject: [PATCH 3/3] Include the kernel's a.out.h instead of glibc's
+
+---
+ src/common/stabs_reader.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/common/stabs_reader.h b/src/common/stabs_reader.h
+index c8b297b5..fd452969 100644
+--- a/src/common/stabs_reader.h
++++ b/src/common/stabs_reader.h
+@@ -52,7 +52,7 @@
+ #ifdef HAVE_MACH_O_NLIST_H
+ #include <mach-o/nlist.h>
+ #elif defined(HAVE_A_OUT_H)
+-#include <a.out.h>
++#include <linux/a.out.h>
+ #endif
+ 
+ #include <string>

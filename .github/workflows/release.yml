@@ -8,33 +8,31 @@ on:
 jobs:
   main-ci:
     uses: ./.github/workflows/ci.yml
-    with:
-      release: true
 
   release:
-    permissions: write-all
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     needs: [ main-ci ]
 
     env:
       PROJECT: 'accelerator'
+      UPLOAD_PASSWORD: ${{ secrets.UPLOAD_PASSWORD }}
     steps:
-      - run: sudo apt-get install -y tree
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Repository checkout
         with:
           fetch-depth: 0
           path: repository
-      
+
       - name: Download Linux release
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: accelerator_linux
           path: linux
 
       - name: Download Windows release
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: accelerator_windows
           path: windows
@@ -55,10 +53,11 @@ jobs:
           echo "LINUX_ZIP=${LINUX_ZIP}" >> $GITHUB_ENV
 
       - name: Upload release
+        if: env.UPLOAD_PASSWORD != ''
         shell: bash
         run: |
           echo "Begin upload for branch (${{ github.ref_name }})"
-          AUTHORIZATION="$(echo -n 'builds:${{ secrets.UPLOAD_PASSWORD }}' | base64)"
+          AUTHORIZATION="$(echo -n "builds:${UPLOAD_PASSWORD}" | base64)"
           echo "::add-mask::${AUTHORIZATION}"
 
           echo "Uploading ${{ env.WINDOWS_ZIP }}"
@@ -74,3 +73,17 @@ jobs:
             exit 1
           fi
           echo "Upload successful!"
+
+      - name: Upload Windows artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.WINDOWS_ZIP }}
+          archive: false
+
+      - name: Upload Linux artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.LINUX_ZIP }}
+          archive: false

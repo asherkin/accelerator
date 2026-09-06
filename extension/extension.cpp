@@ -25,6 +25,10 @@
 
 #include <sp_vm_api.h>
 
+#if SMINTERFACE_EXTENSIONAPI_VERSION >= 9
+#include <base-runtime.h>
+#endif
+
 #include <IWebternet.h>
 #include "MemoryDownloader.h"
 #include "forwards.h"
@@ -1085,24 +1089,16 @@ class UploadThread: public IThread
 	}
 } uploadThread;
 
-class SourcePawnNotifyThread : public IThread
+void Accelerator::NotifyIfDoneUploading()
 {
-public:
-
-	void RunThread(IThreadHandle* pHandle) {
-		for (;;) {
-			// Wait until OnMapStart is called once, this should be enough delay to make sure plugins are loaded.
-			if (g_accelerator.IsMapStarted() && g_accelerator.IsDoneUploading()) {
-				extforwards::CallOnDoneUploadingForward();
-				break;
-			}
-		}
+	if (!IsMapStarted() || !IsDoneUploading()) {
+		return;
 	}
 
-	void OnTerminate(IThreadHandle* pHandle, bool cancel) {
+	if (!m_notified.exchange(true)) {
+		extforwards::CallOnDoneUploadingForward();
 	}
-
-} spNotifyThread;
+}
 
 class VFuncEmptyClass {};
 
@@ -1142,7 +1138,7 @@ const char *GetCmdLine()
 }
 
 Accelerator::Accelerator() :
-	m_doneuploading(false), m_maphasstarted(false)
+	m_doneuploading(false), m_maphasstarted(false), m_notified(false)
 {
 }
 
@@ -1171,7 +1167,6 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	strncpy(crashGameDirectory, g_pSM->GetGameFolderName(), sizeof(crashGameDirectory) - 1);
 
 	threader->MakeThread(&uploadThread);
-	threader->MakeThread(&spNotifyThread); // This thread waits for accelator to be done uploading and for the first OnMapStart call, then fires a SourceMod forward
 
 	do {
 		char gameconfigError[256];
@@ -1234,6 +1229,9 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 #error Bad platform.
 #endif
 
+#if SMINTERFACE_EXTENSIONAPI_VERSION < 9
+	// 1.13 links the SourcePawn VM into sourcemod.logic and dropped ISourcePawnFactory,
+	// so there is no sourcepawn.jit library left to load here.
 	do {
 		char spJitPath[512];
 		g_pSM->BuildPath(Path_SM, spJitPath, sizeof(spJitPath), "bin/" PLATFORM_ARCH_FOLDER "sourcepawn.jit.x86." PLATFORM_LIB_EXT);
@@ -1253,7 +1251,7 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 		ISourcePawnFactory *spFactory = factoryFn(0x0207);
 		if (!spFactory) {
-			smutils->LogMessage(myself, "WARNING: SourcePawn library is out of date: Failed to get version 2.7", 0x0207);
+			smutils->LogMessage(myself, "WARNING: SourcePawn library is out of date: Failed to get version 2.7");
 			break;
 		}
 
@@ -1269,8 +1267,9 @@ bool Accelerator::SDK_OnLoad(char *error, size_t maxlength, bool late)
 			break;
 		}
 
-		strncpy(crashSourceModVersion, spEngine2->GetVersionString(), sizeof(crashSourceModVersion));
+		strncpy(crashSourceModVersion, spEngine2->GetVersionString(), sizeof(crashSourceModVersion) - 1);
 	} while(false);
+#endif
 
 	plsys->AddPluginsListener(this);
 
@@ -1376,12 +1375,16 @@ void Accelerator::SDK_OnAllLoaded()
 	m_natives.push_back({ nullptr, nullptr }); // SM requires this to signal the end of the native info array
 
 	sharesys->AddNatives(myself, m_natives.data());
+
+	NotifyIfDoneUploading();
 }
 
 void Accelerator::OnCoreMapStart(edict_t *pEdictList, int edictCount, int clientMax)
 {
 	strncpy(crashMap, gamehelpers->GetCurrentMap(), sizeof(crashMap) - 1);
 	m_maphasstarted.store(true);
+
+	NotifyIfDoneUploading();
 }
 
 /* 010 Editor Template
@@ -1476,6 +1479,16 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 		return;
 	}
 
+#if SMINTERFACE_EXTENSIONAPI_VERSION >= 9
+	// 1.13 moved publics enumeration onto sp::BaseRuntime.
+	sp::BaseRuntime *publics = runtime->GetBaseRuntime();
+	if (!publics) {
+		return;
+	}
+#else
+	IPluginRuntime *publics = runtime;
+#endif
+
 	const char *filename = plugin->GetFilename();
 	size_t filenameSize = strlen(filename) + 1;
 
@@ -1484,13 +1497,13 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 	size += sizeof(void *); // GetBaseContext
 	size += filenameSize;
 
-	uint32_t count = runtime->GetPublicsNum();
+	uint32_t count = publics->GetPublicsNum();
 	size += sizeof(uint32_t); // count
 	size += count * sizeof(uint32_t); // pubinfo->code_offs
 
 	for (uint32_t i = 0; i < count; ++i) {
 		sp_public_t *pubinfo;
-		runtime->GetPublicByIndex(i, &pubinfo);
+		publics->GetPublicByIndex(i, &pubinfo);
 
 		size += strlen(pubinfo->name) + 1;
 	}
@@ -1512,7 +1525,7 @@ void Accelerator::OnPluginLoaded(IPlugin *plugin)
 
 	for (uint32_t i = 0; i < count; ++i) {
 		sp_public_t *pubinfo;
-		runtime->GetPublicByIndex(i, &pubinfo);
+		publics->GetPublicByIndex(i, &pubinfo);
 
 		memcpy(cursor, &pubinfo->code_offs, sizeof(uint32_t));
 		cursor += sizeof(uint32_t);

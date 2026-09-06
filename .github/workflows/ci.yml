@@ -2,45 +2,61 @@ name: CI
 on:
   workflow_dispatch:
   workflow_call:
-    inputs:
-      release:
-        type: boolean
-        required: true
-        default: false
 
 jobs:
   cache:
     uses: ./.github/workflows/cache.yml
 
-  build-options:
-    runs-on: ubuntu-latest
-    outputs:
-      exclude: ${{ steps.set.outputs.exclude }}
-    steps:
-      - id: set
-        run: |
-          echo "exclude=[${{ inputs.release && '{"runners": { "upload": false } }' || '' }}]" >> $GITHUB_OUTPUT
-  
-  build:
-    name: Build
-    needs: [ cache, build-options ]
-
+  sm112:
+    name: SM 1.12
+    needs: [ cache ]
     strategy:
       fail-fast: false
       matrix:
-        runners: [ 
-          { os: ubuntu-22.04, cc: clang, cxx: clang++, upload: true, upload-artifact-name: accelerator_linux },
-          { os: ubuntu-latest, cc: clang, cxx: clang++, upload: false },
-          { os: windows-latest, cc: msvc, cxx: msvc, upload: true, upload-artifact-name: accelerator_windows }
-        ]
-        exclude: ${{ fromJson(needs.build-options.outputs.exclude) }}
-    
+        include:
+          - os: ubuntu-latest
+            cc: clang-22
+            cxx: clang++-22
+            container: 'ghcr.io/alliedmodders/build-containers/debian11-clang22:latest'
+            artifact: accelerator_linux
+          - os: windows-latest
+            cc: msvc
+            cxx: msvc
+            container: ''
+            artifact: accelerator_windows
     uses: ./.github/workflows/build-extension.yml
     with:
-      os: ${{ matrix.runners.os }}
-      cc: ${{ matrix.runners.cc }}
-      cxx: ${{ matrix.runners.cxx }}
-      upload: ${{ matrix.runners.upload }}
-      upload-artifact-name: ${{ matrix.runners.upload-artifact-name }}
+      os: ${{ matrix.os }}
+      cc: ${{ matrix.cc }}
+      cxx: ${{ matrix.cxx }}
+      container: ${{ matrix.container }}
       cache-key: ${{ needs.cache.outputs.key }}
       cache-dir: ${{ needs.cache.outputs.dir }}
+      upload: true
+      upload-artifact-name: ${{ matrix.artifact }}
+
+  sm113:
+    name: SM 1.13
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cc: clang-22
+            cxx: clang++-22
+            container: 'ghcr.io/alliedmodders/build-containers/debian11-clang22:latest'
+            artifact: accelerator_sm113_linux
+          - os: windows-latest
+            cc: msvc
+            cxx: msvc
+            container: ''
+            artifact: accelerator_sm113_windows
+    uses: ./.github/workflows/build-extension.yml
+    with:
+      os: ${{ matrix.os }}
+      cc: ${{ matrix.cc }}
+      cxx: ${{ matrix.cxx }}
+      container: ${{ matrix.container }}
+      sourcemod-branch: 'master'
+      upload: true
+      upload-artifact-name: ${{ matrix.artifact }}

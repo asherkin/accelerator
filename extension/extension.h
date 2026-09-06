@@ -115,7 +115,7 @@ public: // IPluginsListener
 	/**
 	 * @brief Signals the extension that uploading is done.
 	 */
-	void MarkAsDoneUploading() { m_doneuploading.store(true); }
+	void MarkAsDoneUploading() { m_doneuploading.store(true); NotifyIfDoneUploading(); }
 	/**
 	 * @brief Is Accelerator done uploading crashes.
 	 * @return Returns true if yes, false otherwise.
@@ -128,11 +128,17 @@ public: // IPluginsListener
 	bool IsMapStarted() const { return m_maphasstarted.load(); }
 
 private:
+	/**
+	 * @brief Fires the done uploading forward once uploading has finished and a map has started.
+	 */
+	void NotifyIfDoneUploading();
+
 	std::vector<UploadedCrash> m_uploadedcrashes; // Vector of uploaded crashes
 	std::vector<sp_nativeinfo_t> m_natives; // Vector of SourcePawn natives
 	mutable std::mutex m_uploadedcrashes_mutex; // mutex for accessing the m_uploadedcrashes vector
 	std::atomic_bool m_doneuploading; // Signals that Accelerator is done uploading crashes.
 	std::atomic_bool m_maphasstarted; // Signals that OnMapStart has been called at least once.
+	std::atomic_bool m_notified; // Signals that the done uploading forward has been queued.
 };
 
 // Expose the extension singleton.
